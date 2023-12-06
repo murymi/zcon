@@ -4,6 +4,7 @@ const Allocator = std.mem.Allocator;
 const print = std.debug.print;
 const expect = std.testing.expect;
 const Config = @import("connection.zig").ConnectionConfig;
+const lib = @import("lib.zig");
 
 const c = @cImport({
     @cInclude("mysql.h");
@@ -20,11 +21,14 @@ const ConnectionPool = struct {
     size: usize,
     allocator: Allocator,
     busyConnections: usize,
+    poolMutex: Threads.Mutex,
+    poolCondition: Threads.Condition,
 
     pub const Conn = struct {
             connection: *c.MYSQL,
             next: ?*Conn,
             threadId: Threads.Id,
+            idle: bool,
     };
 
     pub fn init(allocator :Allocator,size :usize) !*Self {
@@ -40,6 +44,7 @@ const ConnectionPool = struct {
 
         firstConnection.connection = myqlStructForFirst.?;
         firstConnection.threadId = @intCast(firstConnection.connection.thread_id);
+        firstConnection.idle = true;
         ptmp.firstConn = firstConnection;
         ptmp.lastConn = firstConnection;
 
@@ -63,6 +68,7 @@ const ConnectionPool = struct {
             var newConnecton = try allocator.create(Conn);
             newConnecton.connection = conn.?;
             newConnecton.threadId = @intCast(firstConnection.connection.thread_id);
+            newConnecton.idle = true;
             ptmp.lastConn.next = newConnecton;
             ptmp.lastConn = newConnecton;
         }
@@ -70,6 +76,9 @@ const ConnectionPool = struct {
         ptmp.size = size;
         ptmp.lastConn.next = null;
         ptmp.busyConnections = 0;
+
+        ptmp.poolMutex = Threads.Mutex{};
+        ptmp.poolCondition = Threads.Condition{};
     
         return ptmp;
     }
@@ -88,7 +97,50 @@ const ConnectionPool = struct {
 
         self.allocator.destroy(self);
     }
-    //@as(?[*c]c.MYSQL, @ptrCast(@alignCast(std.heap.c_allocator.alloc(c.MYSQL, size))));
+
+    pub fn getConnection(self: *Self) *Conn {
+        self.poolMutex.lock();
+        defer self.poolMutex.unlock();
+
+        while(self.busyConnections == self.size){
+            self.poolCondition.wait(&(self.poolMutex));
+        }
+
+        var currConn: ?*Conn = self.firstConn;
+        for(0..self.size)|_|{
+            if(currConn.?.idle){
+                self.busyConnections += 1;
+                break;
+            }
+
+            currConn = currConn.?.next orelse null;
+        }
+
+        if(currConn == null){
+            //TODO
+            unreachable;
+        }
+
+        return currConn.?;
+    }
+
+    pub fn dropConnection(self: *Self, connection: *Conn) void {
+        self.poolMutex.lock();
+        defer self.poolMutex.unlock();
+
+        connection.idle = true;
+        self.busyConnections -= 1;
+    }
+
+    pub fn executeQuery(self: *Self, query: [*c]const u8, parameters: anytype) ![]u8 {
+        const conn = self.getConnection();
+        defer {
+            self.dropConnection(conn);
+        }
+        const res = try lib.executeQuery(conn.connection, query, parameters);
+        return res;
+    }
+
 };
 
 pub fn main() !void {
@@ -98,6 +150,10 @@ pub fn main() !void {
     const pl = try ConnectionPool.init(alloc, 4);
 
     try expect(pl.size == 4);
+
+    const res = try pl.executeQuery("select * from users", .{});
+
+    std.debug.print("{s}\n", .{res});
 
     pl.deInit();
 

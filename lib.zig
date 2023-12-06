@@ -15,13 +15,16 @@ const c = @cImport({
 pub fn executeQuery(mysql: *c.MYSQL, query: [*c]const u8, parameters: anytype) ![]u8 {
     _ = parameters;
 
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+
     const stmt = try prepareStatement(mysql, query);
     try executeStatement(stmt);
     const metadata = try getResultMetadata(stmt);
     const columnCount = getColumnCount(metadata);
     const columns = try getColumns(metadata);
-    const resultBuffers = try bindResultBuffers(stmt, columns, columnCount);
-    const res = try fetchResults(stmt, columns, columnCount, resultBuffers);
+    const resultBuffers = try bindResultBuffers(allocator,stmt, columns, columnCount);
+    const res = try fetchResults(allocator,stmt, columns, columnCount, resultBuffers);
     //resultBuffers.
     return res;
 }
