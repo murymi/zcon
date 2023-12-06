@@ -98,24 +98,3 @@ pub const BuffList = struct {
         return @as(?*anyopaque,@ptrCast(@as([*c]u8 ,@ptrCast(@constCast( @alignCast(str))))));
     }
 };
-
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const alloc = gpa.allocator();
-
-    const buffl = try BuffList.init(alloc, 5);
-
-    try buffl.initBuffer(0,10);
-
-    const xbb = buffl.getBuffer(0);
-    const xbb2 = buffl.getBuffer(0);
-
-    const xb = buffl.getCBuffer(0);
-    _ = xb;
-
-    try buffl.setBuffer("hello", 0);
-
-    try expect(@intFromPtr(xbb) == @intFromPtr(xbb2));
-
-    std.debug.print("{s}",.{xbb2.*});
-}

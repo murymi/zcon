@@ -1,15 +1,17 @@
 const std = @import("std");
-const Thread = std.thread;
+const Threads = std.Thread;
 const Allocator = std.mem.Allocator;
 const print = std.debug.print;
 const expect = std.testing.expect;
+const Config = @import("connection.zig").ConnectionConfig;
 
 const c = @cImport({
     @cInclude("mysql.h");
     @cInclude("stdlib.h");
 });
 
-const Pool = struct {
+
+const ConnectionPool = struct {
     const Self = @This();
 
     //connections: ?[*c]c.MYSQL,
@@ -17,10 +19,12 @@ const Pool = struct {
     lastConn :*Conn,
     size: usize,
     allocator: Allocator,
+    busyConnections: usize,
 
     pub const Conn = struct {
             connection: *c.MYSQL,
             next: ?*Conn,
+            threadId: Threads.Id,
     };
 
     pub fn init(allocator :Allocator,size :usize) !*Self {
@@ -35,6 +39,7 @@ const Pool = struct {
         try expect(myqlStructForFirst != null);
 
         firstConnection.connection = myqlStructForFirst.?;
+        firstConnection.threadId = @intCast(firstConnection.connection.thread_id);
         ptmp.firstConn = firstConnection;
         ptmp.lastConn = firstConnection;
 
@@ -57,12 +62,14 @@ const Pool = struct {
 
             var newConnecton = try allocator.create(Conn);
             newConnecton.connection = conn.?;
+            newConnecton.threadId = @intCast(firstConnection.connection.thread_id);
             ptmp.lastConn.next = newConnecton;
             ptmp.lastConn = newConnecton;
         }
 
         ptmp.size = size;
         ptmp.lastConn.next = null;
+        ptmp.busyConnections = 0;
     
         return ptmp;
     }
@@ -88,7 +95,7 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const alloc = gpa.allocator();
 
-    const pl = try Pool.init(alloc, 4);
+    const pl = try ConnectionPool.init(alloc, 4);
 
     try expect(pl.size == 4);
 
