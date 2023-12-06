@@ -42,18 +42,8 @@ pub const Connection = struct {
     }
 
     pub fn executeQuery(self: *Self, query: [*c]const u8, parameters: anytype) ![]u8 {
-        const stmt = try lib.prepareStatement(self.mysql, query);
-        try lib.executeStatement(stmt);
-
-        const paramLength = parameters.len;
-        _ = paramLength;
-        const metadata = try lib.getResultMetadata(stmt);
-        const columnCount = lib.getColumnCount(metadata);
-        const columns = try lib.getColumns(metadata);
-        const resultBuffers = try lib.bindResultBuffers(self.allocator, stmt, columns, columnCount);
-        const res = try lib.fetchResults(self.allocator, stmt, columns, columnCount, resultBuffers);
-        //resultBuffers.
-        return res;
+        const ms = self.mysql;
+        return try lib.executeQuery(@ptrCast(ms), query, parameters);
     }
 
     pub fn closeConnection(self: *Self) void {

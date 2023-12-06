@@ -12,7 +12,7 @@ const c = @cImport({
 });
 
 
-const ConnectionPool = struct {
+pub const ConnectionPool = struct {
     const Self = @This();
 
     //connections: ?[*c]c.MYSQL,
@@ -31,7 +31,7 @@ const ConnectionPool = struct {
             idle: bool,
     };
 
-    pub fn init(allocator :Allocator,size :usize) !*Self {
+    pub fn init(allocator :Allocator,config: Config,size :usize) !*Self {
 
         const ptmp = try allocator.create(Self);
 
@@ -39,7 +39,7 @@ const ConnectionPool = struct {
         var myqlStructForFirst :?*c.MYSQL = null;
         myqlStructForFirst = c.mysql_init(null);
         try expect(myqlStructForFirst != null);
-        myqlStructForFirst = c.mysql_real_connect(myqlStructForFirst, "localhost", "vic", "1234Victor", "events", c.MYSQL_PORT, null, c.CLIENT_MULTI_STATEMENTS);
+        myqlStructForFirst = c.mysql_real_connect(myqlStructForFirst, config.host, config.username, config.password, config.databaseName, c.MYSQL_PORT, null, c.CLIENT_MULTI_STATEMENTS);
         try expect(myqlStructForFirst != null);
 
         firstConnection.connection = myqlStructForFirst.?;
@@ -48,21 +48,14 @@ const ConnectionPool = struct {
         ptmp.firstConn = firstConnection;
         ptmp.lastConn = firstConnection;
 
-        //const conns = @as(?[*c]c.MYSQL, @ptrCast(@alignCast(c.malloc(@sizeOf(c.MYSQL) *% @as(c_ulong, @bitCast(size))))));
-        //@memset(conns.?, null);
-
-        //ptmp.connections = conns;
-        //ptmp.size = size;
         ptmp.allocator = allocator;
-
-
 
         for(0..size-1)|_|{
             print("hello\n",.{});
             var conn :?*c.MYSQL = null;
             conn = c.mysql_init(null);
             try expect(conn != null);
-            conn = c.mysql_real_connect(conn, "localhost", "vic", "1234Victor", "events", c.MYSQL_PORT, null, c.CLIENT_MULTI_STATEMENTS);
+            conn = c.mysql_real_connect(conn, config.host, config.username, config.password, config.databaseName, c.MYSQL_PORT, null, c.CLIENT_MULTI_STATEMENTS);
             try expect(conn != null);
 
             var newConnecton = try allocator.create(Conn);
@@ -87,8 +80,6 @@ const ConnectionPool = struct {
         
         var ptmp: ?*Conn = self.firstConn;
         for(0..self.size)|_|{
-            //c.mysql_close(@as([*c]c.MYSQL,@ptrCast(self.connections.?[i])));
-
             c.mysql_close(ptmp.?.connection);
             const conn = ptmp;
             ptmp = ptmp.?.next;
@@ -142,20 +133,3 @@ const ConnectionPool = struct {
     }
 
 };
-
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const alloc = gpa.allocator();
-
-    const pl = try ConnectionPool.init(alloc, 4);
-
-    try expect(pl.size == 4);
-
-    const res = try pl.executeQuery("select * from users", .{});
-
-    std.debug.print("{s}\n", .{res});
-
-    pl.deInit();
-
-    //try expect(pl.size == 4);
-}
