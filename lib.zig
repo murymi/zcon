@@ -6,11 +6,19 @@ const json = std.json;
 const writeStream = json.writeStream;
 const Allocator = std.mem.Allocator;
 const time = std.time;
+const expect = std.testing.expect;
 
-const c = @cImport({
+pub const c = @cImport({
     @cInclude("mysql.h");
     @cInclude("stdlib.h");
 });
+
+pub const ConnectionConfig = struct {
+    host: [*c]const u8,
+    username: [*c]const u8,
+    password: [*c]const u8,
+    databaseName: [*c]const u8,
+};
 
 pub fn executeQuery(mysql: *c.MYSQL, query: [*c]const u8, parameters: anytype) ![]u8 {
     _ = parameters;
@@ -27,6 +35,15 @@ pub fn executeQuery(mysql: *c.MYSQL, query: [*c]const u8, parameters: anytype) !
     const res = try fetchResults(allocator,stmt, columns, columnCount, resultBuffers);
     //resultBuffers.
     return res;
+}
+
+pub fn initConnection(config: ConnectionConfig) !*c.MYSQL {
+    var conn :?*c.MYSQL = null;
+    conn = c.mysql_init(null);
+    try expect(conn != null);
+    conn = c.mysql_real_connect(conn, config.host, config.username, config.password, config.databaseName, c.MYSQL_PORT, null, c.CLIENT_MULTI_STATEMENTS);
+    try expect(conn != null);
+    return conn.?;
 }
 
 pub fn getColumns(metadata: *c.MYSQL_RES) ![*c]c.MYSQL_FIELD {

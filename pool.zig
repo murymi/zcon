@@ -1,21 +1,15 @@
 const std = @import("std");
 const Threads = std.Thread;
 const Allocator = std.mem.Allocator;
-const print = std.debug.print;
 const expect = std.testing.expect;
-const Config = @import("connection.zig").ConnectionConfig;
 const lib = @import("lib.zig");
-
-const c = @cImport({
-    @cInclude("mysql.h");
-    @cInclude("stdlib.h");
-});
+const Config = lib.ConnectionConfig;
+const c = lib.c;
 
 
 pub const ConnectionPool = struct {
     const Self = @This();
 
-    //connections: ?[*c]c.MYSQL,
     firstConn :*Conn,
     lastConn :*Conn,
     size: usize,
@@ -27,53 +21,39 @@ pub const ConnectionPool = struct {
     pub const Conn = struct {
             connection: *c.MYSQL,
             next: ?*Conn,
-            threadId: Threads.Id,
             idle: bool,
     };
 
     pub fn init(allocator :Allocator,config: Config,size :usize) !*Self {
-
+        var checkedSize: usize = 2;
+        if(size > checkedSize){
+            checkedSize = size;
+        }
         const ptmp = try allocator.create(Self);
 
-        var firstConnection = try allocator.create(Conn);
-        var myqlStructForFirst :?*c.MYSQL = null;
-        myqlStructForFirst = c.mysql_init(null);
-        try expect(myqlStructForFirst != null);
-        myqlStructForFirst = c.mysql_real_connect(myqlStructForFirst, config.host, config.username, config.password, config.databaseName, c.MYSQL_PORT, null, c.CLIENT_MULTI_STATEMENTS);
-        try expect(myqlStructForFirst != null);
-
-        firstConnection.connection = myqlStructForFirst.?;
-        firstConnection.threadId = @intCast(firstConnection.connection.thread_id);
-        firstConnection.idle = true;
-        ptmp.firstConn = firstConnection;
-        ptmp.lastConn = firstConnection;
-
+        ptmp.firstConn = try createConn(allocator, config);
+        ptmp.lastConn = ptmp.firstConn;
         ptmp.allocator = allocator;
 
-        for(0..size-1)|_|{
-            print("hello\n",.{});
-            var conn :?*c.MYSQL = null;
-            conn = c.mysql_init(null);
-            try expect(conn != null);
-            conn = c.mysql_real_connect(conn, config.host, config.username, config.password, config.databaseName, c.MYSQL_PORT, null, c.CLIENT_MULTI_STATEMENTS);
-            try expect(conn != null);
-
-            var newConnecton = try allocator.create(Conn);
-            newConnecton.connection = conn.?;
-            newConnecton.threadId = @intCast(firstConnection.connection.thread_id);
-            newConnecton.idle = true;
-            ptmp.lastConn.next = newConnecton;
-            ptmp.lastConn = newConnecton;
+        for(0..checkedSize-1)|_|{
+            ptmp.lastConn.next = try createConn(allocator, config);
+            ptmp.lastConn = ptmp.lastConn.next.?;
         }
 
-        ptmp.size = size;
+        ptmp.size = checkedSize;
         ptmp.lastConn.next = null;
         ptmp.busyConnections = 0;
-
         ptmp.poolMutex = Threads.Mutex{};
         ptmp.poolCondition = Threads.Condition{};
-    
         return ptmp;
+    }
+
+    pub fn createConn(allocator: Allocator, config: Config) !*Conn {
+        var newConnecton = try allocator.create(Conn);
+        newConnecton.connection = try lib.initConnection(config);
+        newConnecton.idle = true;
+
+        return newConnecton;
     }
 
     pub fn deInit(self :*Self) void {
@@ -101,6 +81,7 @@ pub const ConnectionPool = struct {
         for(0..self.size)|_|{
             if(currConn.?.idle){
                 self.busyConnections += 1;
+                currConn.?.idle = false;
                 break;
             }
 
@@ -121,6 +102,7 @@ pub const ConnectionPool = struct {
 
         connection.idle = true;
         self.busyConnections -= 1;
+        self.poolCondition.signal();
     }
 
     pub fn executeQuery(self: *Self, query: [*c]const u8, parameters: anytype) ![]u8 {
@@ -133,3 +115,63 @@ pub const ConnectionPool = struct {
     }
 
 };
+
+test "mem leak" {
+     const config: Config = .{ .databaseName = "events", .host = "localhost", .password = "1234Victor", .username = "vic" };
+     const p = try ConnectionPool.init(std.testing.allocator, config, 5);
+     p.deInit();
+}
+
+const testConfig: Config = .{ .databaseName = "events", .host = "localhost", .password = "1234Victor", .username = "vic" };
+var testPool: *ConnectionPool = undefined;
+
+pub fn testFn() void {
+    const id = Threads.getCurrentId();
+    std.debug.print("Thread [{}] Aquiring connection \n", .{id});
+    const conn = testPool.getConnection();
+    std.time.sleep(std.time.ns_per_s);
+
+    std.debug.print("Thread [{}] Dropping connection \n", .{id});
+    testPool.dropConnection(conn);
+    
+}
+
+test "drop" {
+    const config: Config = .{ .databaseName = "events", .host = "localhost", .password = "1234Victor", .username = "vic" };
+    const p = try ConnectionPool.init(std.testing.allocator, config, 2);
+
+     try expect(p.size == 2);
+     const conn1 = p.getConnection();
+     _ = conn1;
+     const conn2 = p.getConnection();
+
+     try expect(conn2.idle == false);
+     try expect(p.busyConnections == 2);
+
+     p.dropConnection(conn2);
+     try expect(conn2.idle);
+     try expect(p.busyConnections == 1);
+
+     const conn3 = p.getConnection();
+     _ = conn3;
+
+     p.deInit();
+}
+
+test "all busy" {
+    testPool = try ConnectionPool.init(std.testing.allocator, testConfig, 1);
+    defer testPool.deInit();
+
+    const t1 = try Threads.spawn(.{}, testFn, .{});
+    const t2 = try Threads.spawn(.{}, testFn, .{});
+    const t3 = try Threads.spawn(.{}, testFn, .{});
+
+    t2.join();
+    t1.join();
+    t3.join();
+}
+
+test "zero" {
+    testPool = try ConnectionPool.init(std.testing.allocator, testConfig, 0);
+    defer testPool.deInit();
+}
