@@ -43,6 +43,7 @@ pub const BuffList = struct {
     }
 
     pub fn initBuffer(self :*Self, pos :usize,buffsize: usize) !void {
+        try expect(self.size > pos);
         var ntmpNode = self.first;
         for(0..pos)|_|{
             ntmpNode = ntmpNode.?.next;
@@ -58,7 +59,8 @@ pub const BuffList = struct {
         ntmpNode.?.data = tmpBuff;
     }
 
-    pub fn getBuffer(self :*Self, pos :usize) *[]u8 {
+    pub fn getBuffer(self :*Self, pos :usize) !*[]u8 {
+        try expect(self.size > pos);
         var ntmp = self.first;
         for(0..pos) |_| {
             ntmp = ntmp.?.next;
@@ -67,13 +69,13 @@ pub const BuffList = struct {
         return &(ntmp.?.data.?);
     }
 
-    pub fn getCBuffer(self :*Self, pos :usize) ?*anyopaque {
-        const b = self.getBuffer(pos);
+    pub fn getCBuffer(self :*Self, pos :usize) !?*anyopaque {
+        const b = try self.getBuffer(pos);
         return @as(?*anyopaque,@ptrCast(@as([*c]u8 ,@ptrCast(@constCast( @alignCast( b.*))))));
     }
 
     pub fn setBuffer(self :*Self, data: []const u8, pos :usize) !void {
-        const tpl = self.getBuffer(pos);
+        const tpl = try self.getBuffer(pos);
 
         try expect(tpl.len >= data.len);
 
@@ -88,8 +90,8 @@ pub const BuffList = struct {
         try self.setBuffer(data, pos);  
     }
 
-    pub fn getBufferAsString(self :*Self,pos :usize) ![]u8 {
-        const buff = self.getBuffer(pos);
+    pub fn getBufferAsString(self :*Self,pos :usize) ![] u8 {
+        const buff = try self.getBuffer(pos);
         return std.mem.sliceTo(buff.*, 0);
     }
 
@@ -97,4 +99,31 @@ pub const BuffList = struct {
         const str = try self.getBufferAsString(pos);
         return @as(?*anyopaque,@ptrCast(@as([*c]u8 ,@ptrCast(@constCast( @alignCast(str))))));
     }
+
+    pub fn deInit(self: *Self) void {
+        var x = self.first;
+        for(0..self.size)|_|{
+            const y = x.?;
+            x = y.next;
+            if(y.data) |ptr| {
+                self.allocator.free(ptr);
+            }
+            self.allocator.destroy(y);
+        }
+
+        self.allocator.destroy(self);
+    }
 };
+
+
+test "buff" {
+    const x = try BuffList.init(std.testing.allocator, 3);
+    try x.initAndSetBuffer("hello world", 2);
+
+    const str = try x.getBufferAsString(2);
+    var cstr = @as(?*anyopaque,@ptrCast(@as([*c]u8 ,@ptrCast(@constCast( @alignCast(str))))));
+
+    cstr = @as(?*anyopaque,@ptrCast(@as([*c]u8 ,@ptrCast(@constCast( @alignCast("hello"))))));
+
+    defer x.deInit();
+}
