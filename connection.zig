@@ -34,6 +34,6 @@ test "mem leak" {
     const config: ConnectionConfig = .{ .databaseName = "events", .host = "localhost", .password = "1234Victor", .username = "vic" };
     const conn = try Connection.newConnection(std.testing.allocator, config);
     const res = try conn.executeQuery("select * from users where name = ?", .{"karanja"});
-    _ = res;
+    defer std.testing.allocator.free(res);
     defer conn.closeConnection();
 }
