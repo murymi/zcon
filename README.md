@@ -11,6 +11,7 @@
            });
 
     const res = try connection.executeQuery("select ? as Greeting", .{"hello world"});
+    defer allocator.free(res);
     std.debug.print("{s}\n", .{res});
 
     connection.close();
@@ -31,6 +32,7 @@
            4);
 
     const res = try pool.executeQuery("select ? as Greeting", .{"hello world"});
+    defer allocator.free(res);
     std.debug.print("{s}\n", .{res});
 
     pool.deInit();
