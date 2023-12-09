@@ -11,6 +11,6 @@ pub fn main() !void {
 
     const connection = try conn.Connection.newConnection(allocator,.{ .databaseName = "events", .host = "localhost", .password = "1234Victor", .username = "vic" });
 
-    const res = try connection.executeQuery("select * from users where name = ?", .{"oyaiiibubua"});
+    const res = try connection.executeQuery("select ? as name", .{2.67});
     std.debug.print("{s}\n", .{res});
 }

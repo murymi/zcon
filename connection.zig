@@ -21,7 +21,7 @@ pub const Connection = struct {
 
     pub fn executeQuery(self: *Self, query: [*c]const u8, parameters: anytype) ![]u8 {
         const ms = self.mysql;
-        return try lib.executeQuery(ms, query, parameters);
+        return try lib.executeQuery(self.allocator,ms, query, parameters);
     }
 
     pub fn closeConnection(self: *Self) void {

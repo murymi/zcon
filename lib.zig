@@ -20,12 +20,7 @@ pub const ConnectionConfig = struct {
     databaseName: [*c]const u8,
 };
 
-pub fn executeQuery(mysql: *c.MYSQL, query: [*c]const u8, parameters: anytype) ![]u8 {
-
-
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
-
+pub fn executeQuery(allocator: Allocator,mysql: *c.MYSQL, query: [*c]const u8, parameters: anytype) ![]u8 {
     const stmt = try prepareStatement(mysql, query);
 
     var pbuff: ?*Bufflist = null;
@@ -34,36 +29,27 @@ pub fn executeQuery(mysql: *c.MYSQL, query: [*c]const u8, parameters: anytype) !
     switch(parameters.len > 0){
         true => { 
             pbuff = try fillParamsList(allocator,parameters);
-            //defer pbuff.deInit();
-            binded = try bindParametersToStatement(stmt, pbuff.?);
-            std.debug.print("Theres parameters {s}\n",.{try pbuff.?.getBufferAsString(0)});
+            if(bindParametersToStatement(stmt, pbuff.?))|val| {
+                binded = val;
+            } else |_|{
+                std.debug.panic("{s} - {s}\n", .{ c.mysql_sqlstate(mysql), c.mysql_error(mysql)});
+            }
         },
-        else => {
-            std.debug.print("No parameters\n",.{});
-        }
+        else => {}
     }
 
 
     defer {
+        if(binded)|ptr|{
+                c.free(@as(?*anyopaque,@ptrCast(ptr)));
+        }
+
         if(pbuff)|ptr|{
             ptr.deInit();
         }
-
-        if(binded)|ptr|{
-            c.free(@as(?*anyopaque,@ptrCast(ptr)));
-        }
     }
 
-    if(executeStatement(stmt))|_| {} else |_|{
-        std.debug.print("{s} - {s}\n", .{ c.mysql_sqlstate(mysql), c.mysql_error(mysql)});
-        unreachable;
-    }
-
-    const metadata = try getResultMetadata(stmt);
-    const columnCount = getColumnCount(metadata);
-    const columns = try getColumns(metadata);
-    const resultBuffers = try bindResultBuffers(allocator,stmt, columns, columnCount);
-    const res = try fetchResults(allocator,stmt, columns, columnCount, resultBuffers);
+    const res = try fetchResults(allocator,stmt);
     //resultBuffers.
 
     return res;
@@ -105,11 +91,12 @@ pub fn prepareStatement(mysql: *c.MYSQL, query: [*c]const u8) !*c.MYSQL_STMT {
 }
 
 pub fn bindParametersToStatement(statement: ?*c.MYSQL_STMT, parameterList: *Bufflist) ![*c]c.MYSQL_BIND {
-        const param_count = c.mysql_stmt_param_count(statement);
+        const param_count = c.mysql_stmt_param_count(statement.?);
 
         try std.testing.expect(param_count == @as(c_ulong, parameterList.size));
 
         var p_bind: [*c]c.MYSQL_BIND = @as([*c]c.MYSQL_BIND, @ptrCast(@alignCast(c.malloc(@sizeOf(c.MYSQL_BIND) *% @as(c_ulong, parameterList.size)))));
+        
         var lens: c_ulong = undefined;
 
         for (0..param_count)|i|{       
@@ -124,11 +111,16 @@ pub fn bindParametersToStatement(statement: ?*c.MYSQL_STMT, parameterList: *Buff
             p_bind[i].buffer_length = 3;
         }
 
-        const statuss = c.mysql_stmt_bind_param(statement, p_bind);
+        const statuss = c.mysql_stmt_bind_param(statement.?, p_bind);
 
         try std.testing.expect(statuss == false);
 
         try std.testing.expect(statement != null);
+
+        if(executeStatement(statement.?))|_| {} else |e|{
+            return e;
+        }
+
         return p_bind;
 }
 
@@ -153,7 +145,6 @@ pub fn fillParamsList(alloc: Allocator, config: anytype) !*Bufflist {
             },
 
             else => {
-                std.debug.print("Type is******** {} *********\n", .{T});
                 try blistParams.initAndSetBuffer(config[i], i);
             }
         }
@@ -203,16 +194,25 @@ pub fn bindResultBuffers(allocator: Allocator,statement: *c.MYSQL_STMT, columns:
     return blist;
 }
 
-pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT, columns: [*c]c.MYSQL_FIELD, columnCount: usize, resultBuffers: *Bufflist) ![]u8 {
+pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT) ![]u8 {
+    const metadata = try getResultMetadata(statement);
+    const columnCount = getColumnCount(metadata);
+
+    const columns = try getColumns(metadata);
+    const resultBuffers = try bindResultBuffers(allocator,statement, columns, columnCount);
+    defer resultBuffers.deInit();
     var list = ArrayList(u8).init(allocator);
+    defer list.deinit();
 
     var wr = writeStream(list.writer(), .{ .whitespace = .indent_1 });
+    defer wr.deinit();
     try wr.beginArray();
 
     while (c.mysql_stmt_fetch(statement) == @as(c_int, 0)) {
         try wr.beginObject();
         for (0..columnCount) |v| {
             const czstr = try cStringToZigString((columns.?[v]).name, allocator);
+            defer allocator.free(czstr);
             try wr.objectField(czstr);
             const value = try resultBuffers.getBufferAsString(v);
             const dataType = (columns.?[v]).type;
@@ -241,7 +241,6 @@ pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT, columns: [*c]
 
     try wr.endArray();
 
-    //todo
     while (c.mysql_stmt_next_result(statement) == @as(c_int, 0)) {}
 
     const resultsJson = std.mem.sliceTo(list.items, 0);

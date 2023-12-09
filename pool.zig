@@ -110,7 +110,7 @@ pub const ConnectionPool = struct {
         defer {
             self.dropConnection(conn);
         }
-        const res = try lib.executeQuery(conn.connection, query, parameters);
+        const res = try lib.executeQuery(self.allocator,conn.connection, query, parameters);
         return res;
     }
 
