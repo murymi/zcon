@@ -38,7 +38,6 @@ pub fn executeQuery(allocator: Allocator,mysql: *c.MYSQL, query: [*c]const u8, p
         else => {}
     }
 
-
     defer {
         if(binded)|ptr|{
                 c.free(@as(?*anyopaque,@ptrCast(ptr)));
@@ -50,8 +49,6 @@ pub fn executeQuery(allocator: Allocator,mysql: *c.MYSQL, query: [*c]const u8, p
     }
 
     const res = try fetchResults(allocator,stmt);
-    //resultBuffers.
-
     return res;
 }
 
