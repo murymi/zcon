@@ -11,7 +11,7 @@ pub fn main() !void {
 
     const connection = try conn.Connection.newConnection(allocator,.{ .databaseName = "events", .host = "localhost", .password = "1234Victor", .username = "vic" });
 
-    const res = try connection.executeQuery("select * from users", .{});
+    const res = try connection.executeQuery("select ? as greeting", .{"hello world"});
     std.debug.print("{s}\n", .{res});
 
     allocator.free(res);

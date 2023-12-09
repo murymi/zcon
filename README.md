@@ -1,5 +1,8 @@
+
+#### Disclaimer: This is just a simple project to learn zig. Even though it works, Use it at your own risk.
+works on  zig v0.12.0
 #### single connection example
-```
+```zig
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
 
@@ -19,7 +22,7 @@
 
 #### pool example
 
-```
+```zig
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
 
