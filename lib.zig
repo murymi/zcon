@@ -84,7 +84,8 @@ pub fn prepareStatement(mysql: *c.MYSQL, query: [*c]const u8) !*c.MYSQL_STMT {
     return statement.?;
 }
 
-pub fn bindParametersToStatement(statement: ?*c.MYSQL_STMT, parameterList: *Bufflist) ![*c]c.MYSQL_BIND {
+pub fn bindParametersToStatement(statement: ?*c.MYSQL_STMT, parameterList: *Bufflist, lengths: *[15]c_ulong) ![*c]c.MYSQL_BIND {
+
         const param_count = c.mysql_stmt_param_count(statement.?);
 
         if(param_count != @as(c_ulong, parameterList.size)){
@@ -92,17 +93,15 @@ pub fn bindParametersToStatement(statement: ?*c.MYSQL_STMT, parameterList: *Buff
         }
 
         var p_bind: [*c]c.MYSQL_BIND = @as([*c]c.MYSQL_BIND, @ptrCast(@alignCast(c.malloc(@sizeOf(c.MYSQL_BIND) *% @as(c_ulong, parameterList.size)))));
-        
-        var lens: c_ulong = undefined;
 
         for (0..param_count)|i|{       
             const wcd = try parameterList.getBufferAsString(i);
-            lens = @as(c_ulong,wcd.len);
+            lengths.*[i] = @as(c_ulong,wcd.len);
             const bf = @as(?*anyopaque,@ptrCast(@as([*c]u8 ,@ptrCast(@constCast( @alignCast(wcd))))));
 
             p_bind[i].buffer_type = c.MYSQL_TYPE_STRING;
+            p_bind[i].length = &(lengths.*[i]);
             p_bind[i].is_null = 0;
-            p_bind[i].length = &(lens);
             p_bind[i].buffer = bf;
         }
 
@@ -221,6 +220,8 @@ pub fn fetchResults(allocator: Allocator,mysql :*c.MYSQL, query: [*c]const u8,pa
     var pbuff: ?*Bufflist = null;
     var binded: ?[*c]c.MYSQL_BIND = null;
 
+    var lengths: [15]c_ulong = [1]c_ulong{0} ** 15;
+
     defer {
         if(binded)|ptr|{
             c.free(@as(?*anyopaque,@ptrCast(ptr)));
@@ -234,7 +235,7 @@ pub fn fetchResults(allocator: Allocator,mysql :*c.MYSQL, query: [*c]const u8,pa
     switch(parameters.len > 0){
         true => { 
             pbuff = try fillParamsList(allocator,parameters);
-            binded = try bindParametersToStatement(statement, pbuff.?);
+            binded = try bindParametersToStatement(statement, pbuff.?,&lengths);
         },
         else => {
            try executeStatement(statement);
