@@ -24,7 +24,7 @@ pub const Connection = struct {
         return try lib.executeQuery(self.allocator,ms, query, parameters);
     }
 
-    pub fn closeConnection(self: *Self) void {
+    pub fn close(self: *Self) void {
         c.mysql_close(self.mysql);
         self.allocator.destroy(self);
     }
