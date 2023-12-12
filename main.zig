@@ -16,13 +16,13 @@ pub fn main() !void {
     const p = try pool.ConnectionPool.init(allocator,.{ .databaseName = "events", .host = "localhost", .password = "1234Victor", .username = "vic" } , 2);
 
     const connection = p.getConnection();
-    defer p.dropConnection(connection);
+    //p.dropConnection(connection);
     //const res = try connection.executeQuery("select * from users where name = ? and verified = ? and username = ?;", .{"karanja",7, "vic"});
     const statement = try connection.prepare("select * from users where name = ? and verified = ? and username = ?;");
     var res = try statement.execute(.{"karanja",7, "vic"});
     std.debug.print("{s}\n", .{res});
 
-    res = try statement.execute(.{"karanja", 0,"vic"});
+    res = try connection.executeQuery("select * from users where name = ? and verified = ? and username = ?",.{"karanja",0,"vic"});
 
     std.debug.print("{s}\n", .{res});
 

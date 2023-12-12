@@ -15,7 +15,9 @@ pub const c = @cImport({
 
 pub const CustomErr = error {
     sqlErr,
-    parameterErr
+    parameterErr,
+    connectionBusy,
+    connectionIdle,
 };
 
 pub const ConnectionConfig = struct {

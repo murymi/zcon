@@ -26,7 +26,12 @@ pub const ConnectionPool = struct {
             allocator: Allocator,
 
             pub fn prepare(self: *Conn, query: [*c]const u8) !*prepStmt {
+                if(self.idle) return error.connectionIdle;
                 return try prepStmt.init(self.allocator,self.connection, query);
+            }
+
+            pub fn executeQuery(self: *Conn, query: [*c]const u8, parameters: anytype) ![]u8 {
+                return try lib.executeQuery(self.allocator,self.connection, query, parameters);
             }
     };
 
@@ -54,7 +59,7 @@ pub const ConnectionPool = struct {
         return ptmp;
     }
 
-    pub fn createConn(allocator: Allocator, config: Config) !*Conn {
+    fn createConn(allocator: Allocator, config: Config) !*Conn {
         var newConnecton = try allocator.create(Conn);
         newConnecton.connection = try lib.initConnection(config);
         newConnecton.idle = true;
