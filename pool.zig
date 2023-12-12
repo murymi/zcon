@@ -3,6 +3,7 @@ const Threads = std.Thread;
 const Allocator = std.mem.Allocator;
 const expect = std.testing.expect;
 const lib = @import("lib.zig");
+const prepStmt = @import("statement.zig").Statement;
 const Config = lib.ConnectionConfig;
 const c = lib.c;
 
@@ -22,6 +23,11 @@ pub const ConnectionPool = struct {
             connection: *c.MYSQL,
             next: ?*Conn,
             idle: bool,
+            allocator: Allocator,
+
+            pub fn prepare(self: *Conn, query: [*c]const u8) !*prepStmt {
+                return try prepStmt.init(self.allocator,self.connection, query);
+            }
     };
 
     pub fn init(allocator :Allocator,config: Config,size :usize) !*Self {
@@ -52,6 +58,7 @@ pub const ConnectionPool = struct {
         var newConnecton = try allocator.create(Conn);
         newConnecton.connection = try lib.initConnection(config);
         newConnecton.idle = true;
+        newConnecton.allocator = allocator;
 
         return newConnecton;
     }

@@ -40,3 +40,24 @@ works on  zig v0.12.0
 
     pool.deInit();
 ```
+
+#### pool example
+
+```zig
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+
+    const pool = try ConnectionPool.init(allocator,.{ 
+        .databaseName = "dbname",
+         .host = "host",
+          .password = "password",
+           .username = "username" 
+           },
+           4);
+
+    const res = try pool.executeQuery("select ? as Greeting", .{"hello world"});
+    defer allocator.free(res);
+    std.debug.print("{s}\n", .{res});
+
+    pool.deInit();
+```
