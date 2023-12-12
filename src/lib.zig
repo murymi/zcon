@@ -28,16 +28,20 @@ pub const ConnectionConfig = struct {
     databaseName: [*c]const u8,
 };
 
+//Execute query, results in json
 pub fn executeQuery(allocator: Allocator,mysql: *c.MYSQL, query: [*c]const u8, parameters: anytype) ![]u8 {
+    // create statement
     const statement = try prepareStatement(mysql, query);
     defer {
        _= c.mysql_stmt_close(@ptrCast(statement));
     }
 
+    // fetch resulst
     if(fetchResults(allocator,statement,parameters))|res|{
         return res;
     }else |err| {
         switch (err) {
+            // for now panic on sql query errors.
             error.sqlErr => {
                 std.debug.panic("{s} - {s}\n", .{ c.mysql_sqlstate(mysql), c.mysql_error(mysql)});
             },
@@ -53,6 +57,7 @@ pub fn executeQuery(allocator: Allocator,mysql: *c.MYSQL, query: [*c]const u8, p
     //_= c.mysql_stmt_close(statement);
 }
 
+//create C connection struct
 pub fn initConnection(config: ConnectionConfig) CustomErr!*c.MYSQL {
     var conn :?*c.MYSQL = null;
     conn = c.mysql_init(null);
@@ -78,6 +83,8 @@ pub fn getColumns(metadata: *c.MYSQL_RES) CustomErr![*c]c.MYSQL_FIELD {
     } 
 }
 
+
+// creates C statement struct
 pub fn prepareStatement(mysql: *c.MYSQL, query: [*c]const u8) !*c.MYSQL_STMT {
     var statement: ?*c.MYSQL_STMT = null;
 
@@ -97,6 +104,8 @@ pub fn prepareStatement(mysql: *c.MYSQL, query: [*c]const u8) !*c.MYSQL_STMT {
     return statement.?;
 }
 
+
+//Binds query parameters to statement struct
 pub fn bindParametersToStatement(statement: ?*c.MYSQL_STMT, parameterList: *Bufflist, lengths: *[]c_ulong) ![*c]c.MYSQL_BIND {
 
         const param_count = c.mysql_stmt_param_count(statement.?);
@@ -135,6 +144,7 @@ pub fn bindParametersToStatement(statement: ?*c.MYSQL_STMT, parameterList: *Buff
         return p_bind;
 }
 
+// fill parameters to a buffer list for binding
 pub fn fillParamsList(alloc: Allocator, config: anytype) !*Bufflist {
     const paramLen = config.len;
 
@@ -162,6 +172,7 @@ pub fn fillParamsList(alloc: Allocator, config: anytype) !*Bufflist {
     return blistParams;
 }
 
+// 
 pub fn executeStatement(statement: *c.MYSQL_STMT) CustomErr!void {
     const err = c.mysql_stmt_execute(statement);
     if(std.testing.expect(err == 0))|_|{} else |_|{
@@ -174,6 +185,7 @@ pub fn getColumnCount(meta: *c.MYSQL_RES) usize {
     return column_count;
 }
 
+// get metadata of the results
 pub fn getResultMetadata(statement: *c.MYSQL_STMT) !*c.MYSQL_RES {
     var res_meta_data: ?*c.MYSQL_RES = null;
     res_meta_data = c.mysql_stmt_result_metadata(statement);
@@ -185,7 +197,7 @@ pub fn getResultMetadata(statement: *c.MYSQL_STMT) !*c.MYSQL_RES {
     }
 }
 
-//pub fn getColumnCount()
+// bind result buffers 
 pub fn bindResultBuffers(allocator: Allocator,
                         statement: *c.MYSQL_STMT,
                         columns: [*c]c.MYSQL_FIELD,
@@ -217,8 +229,8 @@ pub fn bindResultBuffers(allocator: Allocator,
     return blist;
 }
 
+// get affected rows for querys that do not return results
 pub fn getAffectedRows(allocator: Allocator, statement: *c.MYSQL_STMT) ![]u8 {
-
     var list: ArrayList(u8) = ArrayList(u8).init(allocator);
     defer list.deinit();
 
@@ -234,13 +246,17 @@ pub fn getAffectedRows(allocator: Allocator, statement: *c.MYSQL_STMT) ![]u8 {
     return try allocator.dupe(u8, list.items);
 }
 
+// Fetching and structuring results to json
 pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT,parameters: anytype) ![]u8 {
+    // parameter buffer list
     var pbuff: ?*Bufflist = null;
+
+    // structs to bind each parameter to.
     var binded: ?[*c]c.MYSQL_BIND = null;
 
+    // holds lengths of parameters when binding
     var lengths = try allocator.alloc(c_ulong, parameters.len);
     defer allocator.free(lengths);
-    //[15]c_ulong = [1]c_ulong{0} ** 15;
 
     defer {
         if(binded)|ptr|{
@@ -252,6 +268,7 @@ pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT,parameters: an
         }
     }
 
+    // check if parameters are given for binding, else skip binding and only execute statement
     switch(parameters.len > 0){
         true => { 
             pbuff = try fillParamsList(allocator,parameters);
@@ -259,6 +276,7 @@ pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT,parameters: an
             binded = try bindParametersToStatement(statement, pbuff.?,&lengths);
         },
         else => {
+            // execute statement 
            try executeStatement(statement);
         }
     }
@@ -278,11 +296,15 @@ pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT,parameters: an
 
     const columnCount = getColumnCount(metadata);
 
-
+    // holds lengths of each column
     var resLengths = try allocator.alloc(c_ulong, columnCount);
     defer allocator.free(resLengths);
+
+    // holds nullabilty of each col
     var resNulls = try allocator.alloc(bool, columnCount);
     defer allocator.free(resNulls);
+
+    // holds errors of each col
     var resErrs = try allocator.alloc(bool, columnCount);
     defer allocator.free(resErrs);
 
@@ -334,6 +356,7 @@ pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT,parameters: an
     try wr.endArray();
 
     //ToDo
+    // for handling multiple result sets
     while (c.mysql_stmt_next_result(statement) == @as(c_int, 0)) {}
 
     return try allocator.dupe(u8, list.items);

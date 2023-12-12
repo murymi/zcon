@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 const expect = std.testing.expect;
 const ArrayList = std.ArrayList;
 
+//This is a list to hold buffers when binding parameters and results
 pub const BuffList = struct {
     const Self = @This();
 
@@ -16,6 +17,7 @@ pub const BuffList = struct {
         next: ?*Node,
     };
 
+    // create new list of buffers
     pub fn init(allocator: Allocator,size: usize) !*Self{
         const tmp = try allocator.create(Self);
 
@@ -42,6 +44,7 @@ pub const BuffList = struct {
         return tmp;
     }
 
+    //resize buffer to size buffsize
     pub fn initBuffer(self :*Self, pos :usize,buffsize: usize) !void {
         try expect(self.size > pos);
         var ntmpNode = self.first;
@@ -59,6 +62,7 @@ pub const BuffList = struct {
         ntmpNode.?.data = tmpBuff;
     }
 
+    //Get Z type buffer at pos
     pub fn getBuffer(self :*Self, pos :usize) !*[]u8 {
         try expect(self.size > pos);
         var ntmp = self.first;
@@ -69,11 +73,13 @@ pub const BuffList = struct {
         return &(ntmp.?.data.?);
     }
 
+    //get C type buffer at pos
     pub fn getCBuffer(self :*Self, pos :usize) !?*anyopaque {
         const b = try self.getBuffer(pos);
         return @as(?*anyopaque,@ptrCast(@as([*c]u8 ,@ptrCast(@constCast( @alignCast( b.*))))));
     }
 
+    //copy string data to buffer at pos
     pub fn setBuffer(self :*Self, data: []const u8, pos :usize) !void {
         const tpl = try self.getBuffer(pos);
 
@@ -85,21 +91,25 @@ pub const BuffList = struct {
 
     }
 
+    //Resize and set Buffer
     pub fn initAndSetBuffer(self: *Self, data: []const u8, pos: usize) !void {
         try self.initBuffer(pos, data.len + 1);
         try self.setBuffer(data, pos);  
     }
 
+    //Get buffer as Zig string
     pub fn getBufferAsString(self :*Self,pos :usize) ![] u8 {
         const buff = try self.getBuffer(pos);
         return std.mem.sliceTo(buff.*, 0);
     }
 
+    //Get buffer casted to C string
     pub fn getInitializedCBuffer(self :*Self, pos: usize) !?*anyopaque{
         const str = try self.getBufferAsString(pos);
         return @as(?*anyopaque,@ptrCast(@as([*c]u8 ,@ptrCast(@constCast( @alignCast(str))))));
     }
 
+    //clean up
     pub fn deInit(self: *Self) void {
         var x = self.first;
         for(0..self.size)|_|{

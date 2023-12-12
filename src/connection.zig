@@ -6,13 +6,18 @@ const Statement = @import("statement.zig").Statement;
 
 const c = lib.c;
 
+//Single DB connection
 pub const Connection = struct {
     const Self = @This();
 
+    // C type Connection struct
     mysql: *c.MYSQL,
+
     allocator: Allocator,
+
     dirty: bool,
 
+    // Creates a connection
     pub fn newConnection(allocator: Allocator, config: ConnectionConfig) !*Self {
         const newSelf = try allocator.create(Self);
         newSelf.allocator = allocator;
@@ -22,6 +27,7 @@ pub const Connection = struct {
         return newSelf;
     }
 
+    // Execute query. Returns result in json format
     pub fn executeQuery(self: *Self, query: [*c]const u8, parameters: anytype) ![]u8 {
         const ms = self.mysql;
         self.dirty = true;
@@ -33,6 +39,7 @@ pub const Connection = struct {
         self.allocator.destroy(self);
     }
 
+    // Create prepared statement
     pub fn prepare(self: *Self, query: [*c]const u8) !*Statement {
         //if(self.dirty) return error.connectionDirty;
         return try Statement.init(self.allocator,self.mysql, query);

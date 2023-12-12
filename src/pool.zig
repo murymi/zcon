@@ -84,7 +84,7 @@ pub const ConnectionPool = struct {
     pub fn getConnection(self: *Self) *Conn {
         self.poolMutex.lock();
         defer self.poolMutex.unlock();
-
+        // wait is all busy
         while(self.busyConnections == self.size){
             self.poolCondition.wait(&(self.poolMutex));
         }
