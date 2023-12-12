@@ -195,11 +195,6 @@ pub fn bindResultBuffers(allocator: Allocator,
                         nulls: *[*c]bool,
                         errors: *[*c]bool
                         ) !*Bufflist {
-
-
-
-
-    //var result_bind: [*c]c.MYSQL_BIND = ;
     toBind.* = @as([*c]c.MYSQL_BIND, @ptrCast(@alignCast(c.malloc(@sizeOf(c.MYSQL_BIND) *% @as(c_ulong, columnCount)))));
     const blist = try Bufflist.init(allocator, @as(usize, columnCount));
 

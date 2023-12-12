@@ -44,5 +44,5 @@ test "mem leak" {
     const conn = try Connection.newConnection(std.testing.allocator, config);
     const res = try conn.executeQuery("select * from users where name = ?", .{"karanja"});
     defer std.testing.allocator.free(res);
-    defer conn.closeConnection();
+    defer conn.close();
 }

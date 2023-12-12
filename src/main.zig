@@ -11,11 +11,12 @@ pub fn main() !void {
     defer connection.close();
 
     const res = try connection.executeQuery("select * from users where name = ?", .{"karanja"});
-    std.debug.print("{s}\n", .{res});
+    _ = res;
+    //std.debug.print("{s}\n", .{res});
 
-    const statement = try connection.prepare("call insert_user(?,?,?)");
+    const statement = try connection.prepare("call massive_test()");
     defer statement.close();
-    const res2 = try statement.execute(.{"kamauy", "nigggahhgryy", "yeah brohrgyy"});
+    const res2 = try statement.execute(.{});
 
-    std.debug.print("{s}\n", .{res2});
+    std.debug.print("{s} {}\n", .{res2, res2.len});
 }

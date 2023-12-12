@@ -1,7 +1,7 @@
-const bufflist = @import("bufflist.zig");
-const connection = @import("connection.zig");
-const lib = @import("lib.zig");
-const pool = @import("pool.zig");
+const bufflist = @import("src/bufflist.zig");
+const connection = @import("src/connection.zig");
+const lib = @import("src/lib.zig");
+const pool = @import("src/pool.zig");
 
 test "global" {
     _ = bufflist;
