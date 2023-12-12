@@ -11,8 +11,10 @@ pub fn main() !void {
 
     const connection = try conn.Connection.newConnection(allocator,.{ .databaseName = "events", .host = "localhost", .password = "1234Victor", .username = "vic" });
 
-    const res = try connection.executeQuery("select * from users where name = ? and verified = ? and username = ?;", .{"karanja",0, "vic"});
+    //const res = try connection.executeQuery("select * from users where name = ? and verified = ? and username = ?;", .{"karanja",7, "vic"});
+    const statement = try connection.prepare("select * from users where name = ? and verified = ? and username = ?;");
+    const res = try statement.execute(.{"karanja",7, "vic"});
     std.debug.print("{s}\n", .{res});
 
-    allocator.free(res);
+    //allocator.free(res);
 }

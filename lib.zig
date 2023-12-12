@@ -26,7 +26,12 @@ pub const ConnectionConfig = struct {
 };
 
 pub fn executeQuery(allocator: Allocator,mysql: *c.MYSQL, query: [*c]const u8, parameters: anytype) ![]u8 {
-    if(fetchResults(allocator,mysql,query,parameters))|res|{
+    const statement = try prepareStatement(mysql, query);
+    defer {
+        _= c.mysql_stmt_close(statement);
+    }
+
+    if(fetchResults(allocator,statement,parameters))|res|{
         return res;
     }else |err| {
         switch (err) {
@@ -210,13 +215,7 @@ pub fn getAffectedRows(allocator: Allocator, statement: *c.MYSQL_STMT) ![]u8 {
     return try allocator.dupe(u8, list.items);
 }
 
-pub fn fetchResults(allocator: Allocator,mysql :*c.MYSQL, query: [*c]const u8,parameters: anytype) ![]u8 {
-
-    const statement = try prepareStatement(mysql, query);
-    defer {
-        _= c.mysql_stmt_close(statement);
-    }
-
+pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT,parameters: anytype) ![]u8 {
     var pbuff: ?*Bufflist = null;
     var binded: ?[*c]c.MYSQL_BIND = null;
 
@@ -241,7 +240,6 @@ pub fn fetchResults(allocator: Allocator,mysql :*c.MYSQL, query: [*c]const u8,pa
            try executeStatement(statement);
         }
     }
-
 
     var metadata: *c.MYSQL_RES = undefined;
     defer {

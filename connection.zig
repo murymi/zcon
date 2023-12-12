@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const lib = @import("lib.zig");
 const ConnectionConfig = lib.ConnectionConfig;
+const Statement = @import("statement.zig").Statement;
 
 const c = lib.c;
 
@@ -27,6 +28,10 @@ pub const Connection = struct {
     pub fn close(self: *Self) void {
         c.mysql_close(self.mysql);
         self.allocator.destroy(self);
+    }
+
+    pub fn prepare(self: *Self, query: [*c]const u8) !*Statement {
+        return try Statement.init(self.allocator,self.mysql, query);
     }
 };
 
