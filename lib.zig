@@ -97,7 +97,7 @@ pub fn prepareStatement(mysql: *c.MYSQL, query: [*c]const u8) !*c.MYSQL_STMT {
     return statement.?;
 }
 
-pub fn bindParametersToStatement(statement: ?*c.MYSQL_STMT, parameterList: *Bufflist, lengths: *[15]c_ulong) ![*c]c.MYSQL_BIND {
+pub fn bindParametersToStatement(statement: ?*c.MYSQL_STMT, parameterList: *Bufflist, lengths: *[]c_ulong) ![*c]c.MYSQL_BIND {
 
         const param_count = c.mysql_stmt_param_count(statement.?);
 
@@ -243,7 +243,9 @@ pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT,parameters: an
     var pbuff: ?*Bufflist = null;
     var binded: ?[*c]c.MYSQL_BIND = null;
 
-    var lengths: [15]c_ulong = [1]c_ulong{0} ** 15;
+    var lengths = try allocator.alloc(c_ulong, parameters.len);
+    defer allocator.free(lengths);
+    //[15]c_ulong = [1]c_ulong{0} ** 15;
 
     defer {
         if(binded)|ptr|{
@@ -283,8 +285,11 @@ pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT,parameters: an
 
 
     var resLengths = try allocator.alloc(c_ulong, columnCount);
+    defer allocator.free(resLengths);
     var resNulls = try allocator.alloc(bool, columnCount);
+    defer allocator.free(resNulls);
     var resErrs = try allocator.alloc(bool, columnCount);
+    defer allocator.free(resErrs);
 
 
     const columns = try getColumns(metadata);

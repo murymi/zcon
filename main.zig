@@ -15,7 +15,7 @@ pub fn main() !void {
 
     const statement = try connection.prepare("call insert_user(?,?,?)");
     defer statement.close();
-    const res2 = try statement.execute(.{"kamau", "nigggahhg", "yeah brohg"});
+    const res2 = try statement.execute(.{"kamauy", "nigggahhgryy", "yeah brohrgyy"});
 
     std.debug.print("{s}\n", .{res2});
 }
