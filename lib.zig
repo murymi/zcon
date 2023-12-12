@@ -18,6 +18,7 @@ pub const CustomErr = error {
     parameterErr,
     connectionBusy,
     connectionIdle,
+    connectionDirty,
 };
 
 pub const ConnectionConfig = struct {
@@ -30,7 +31,7 @@ pub const ConnectionConfig = struct {
 pub fn executeQuery(allocator: Allocator,mysql: *c.MYSQL, query: [*c]const u8, parameters: anytype) ![]u8 {
     const statement = try prepareStatement(mysql, query);
     defer {
-        _= c.mysql_stmt_close(statement);
+       _= c.mysql_stmt_close(@ptrCast(statement));
     }
 
     if(fetchResults(allocator,statement,parameters))|res|{
@@ -48,6 +49,8 @@ pub fn executeQuery(allocator: Allocator,mysql: *c.MYSQL, query: [*c]const u8, p
             }
         }
     }
+
+    //_= c.mysql_stmt_close(statement);
 }
 
 pub fn initConnection(config: ConnectionConfig) CustomErr!*c.MYSQL {
@@ -183,19 +186,22 @@ pub fn getResultMetadata(statement: *c.MYSQL_STMT) !*c.MYSQL_RES {
 }
 
 //pub fn getColumnCount()
-pub fn bindResultBuffers(allocator: Allocator,statement: *c.MYSQL_STMT, columns: [*c]c.MYSQL_FIELD, columnCount: usize) !*Bufflist {
-    var result_bind: [*c]c.MYSQL_BIND = @as([*c]c.MYSQL_BIND, @ptrCast(@alignCast(c.malloc(@sizeOf(c.MYSQL_BIND) *% @as(c_ulong, columnCount)))));
+pub fn bindResultBuffers(allocator: Allocator,statement: *c.MYSQL_STMT, columns: [*c]c.MYSQL_FIELD, columnCount: usize,toBind :*[*c]c.MYSQL_BIND) !*Bufflist {
+
+    //var result_bind: [*c]c.MYSQL_BIND = ;
+    toBind.* = @as([*c]c.MYSQL_BIND, @ptrCast(@alignCast(c.malloc(@sizeOf(c.MYSQL_BIND) *% @as(c_ulong, columnCount)))));
     const blist = try Bufflist.init(allocator, @as(usize, columnCount));
 
     for (0..columnCount) |i| {
-        result_bind[i].buffer_type = c.MYSQL_TYPE_STRING;
+        toBind.*[i].buffer_type = c.MYSQL_TYPE_STRING;
         const len = @as(usize, (columns.?[i]).length);
         try blist.initBuffer(i, len);
-        result_bind[i].buffer = try blist.getCBuffer(i);
-        result_bind[i].buffer_length = len;
+        toBind.*[i].buffer = try blist.getCBuffer(i);
+        toBind.*[i].buffer_length = len;
+        //toBind.*[i].length = 3000;
     }
 
-    const succ = c.mysql_stmt_bind_result(statement, @as([*c]c.MYSQL_BIND, @ptrCast(@alignCast(result_bind))));
+    const succ = c.mysql_stmt_bind_result(statement, @as([*c]c.MYSQL_BIND, @ptrCast(@alignCast(toBind.*))));
     if(succ != false){
         return error.sqlErr;
     }
@@ -239,6 +245,7 @@ pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT,parameters: an
     switch(parameters.len > 0){
         true => { 
             pbuff = try fillParamsList(allocator,parameters);
+
             binded = try bindParametersToStatement(statement, pbuff.?,&lengths);
         },
         else => {
@@ -261,7 +268,10 @@ pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT,parameters: an
 
     const columnCount = getColumnCount(metadata);
     const columns = try getColumns(metadata);
-    const resultBuffers = try bindResultBuffers(allocator,statement, columns, columnCount);
+
+    var resBind: [*c]c.MYSQL_BIND = undefined;
+    const resultBuffers = try bindResultBuffers(allocator,statement, columns, 
+    columnCount, &resBind);
     defer resultBuffers.deInit();
     var list = ArrayList(u8).init(allocator);
     defer list.deinit();

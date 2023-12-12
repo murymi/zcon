@@ -171,3 +171,6 @@ zig run blabla.zig `mysql_config --libs` `mysql_config --cflags` -lc
     //free pool
     pool.deInit();
 ```
+
+#### Known bugs
+Trying to prepare a statement from a connection that has already been used for normal query is an error.

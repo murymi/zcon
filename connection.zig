@@ -11,10 +11,12 @@ pub const Connection = struct {
 
     mysql: *c.MYSQL,
     allocator: Allocator,
+    dirty: bool,
 
     pub fn newConnection(allocator: Allocator, config: ConnectionConfig) !*Self {
         const newSelf = try allocator.create(Self);
         newSelf.allocator = allocator;
+        newSelf.dirty = false;
         newSelf.mysql = try lib.initConnection(config);
 
         return newSelf;
@@ -22,6 +24,7 @@ pub const Connection = struct {
 
     pub fn executeQuery(self: *Self, query: [*c]const u8, parameters: anytype) ![]u8 {
         const ms = self.mysql;
+        self.dirty = true;
         return try lib.executeQuery(self.allocator,ms, query, parameters);
     }
 
@@ -31,6 +34,7 @@ pub const Connection = struct {
     }
 
     pub fn prepare(self: *Self, query: [*c]const u8) !*Statement {
+        //if(self.dirty) return error.connectionDirty;
         return try Statement.init(self.allocator,self.mysql, query);
     }
 };

@@ -13,10 +13,18 @@ pub const Statement = struct {
 
     pub fn init(allocator: Allocator,mysql: *c.MYSQL, query: [*c]const u8) !*Self {
         var newSelf = try allocator.create(Self);
-        newSelf.stmt = try lib.prepareStatement(mysql, query);
-        newSelf.allocator = allocator;
-        newSelf.mysql = mysql;
-        return newSelf;
+
+        if(lib.prepareStatement(mysql, query)) |ptr| {
+            newSelf.stmt = ptr;
+            newSelf.allocator = allocator;
+            newSelf.mysql = mysql;
+            return newSelf;
+        } else |er|{
+            switch (er) {
+                error.sqlErr => std.debug.panic("{s} - {s}\n", .{ c.mysql_sqlstate(mysql), c.mysql_error(mysql)}),
+                else => |e| return e,
+            }
+        }
     }
 
     pub fn close(self: *Self) void {
