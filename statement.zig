@@ -1,27 +1,43 @@
 const lib = @import("lib.zig");
 const c = lib.c;
-const Allocator = @import("std").mem.Allocator;
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+const err = lib.CustomErr;
 
 pub const Statement = struct {
     const Self = @This();
 
     stmt: *c.MYSQL_STMT,
     allocator: Allocator,
+    mysql: *c.MYSQL,
 
     pub fn init(allocator: Allocator,mysql: *c.MYSQL, query: [*c]const u8) !*Self {
         var newSelf = try allocator.create(Self);
         newSelf.stmt = try lib.prepareStatement(mysql, query);
         newSelf.allocator = allocator;
+        newSelf.mysql = mysql;
         return newSelf;
     }
 
     pub fn close(self: *Self) void {
-        c.mysql_stmt_close(self.stmt);
+        _ = c.mysql_stmt_close(self.stmt);
         self.allocator.destroy(self);
     }
 
     pub fn execute(self: *Self, params: anytype) ![]u8 {
-        return lib.fetchResults(self.allocator, self.stmt, params);
+        if(lib.fetchResults(self.allocator, self.stmt, params)) |ptr| {
+            return ptr;
+        } else |e|{
+            switch(e){
+                error.sqlErr => {
+                    std.debug.panic("{s} - {s}\n", .{ c.mysql_sqlstate(self.mysql), c.mysql_error(self.mysql)});
+                },
+                error.parameterErr =>{
+                    std.debug.panic("Expected number of parameters not met", .{});
+                },
+                else =>|er| return er
+            }
+        }
     }
 
 };

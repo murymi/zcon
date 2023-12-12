@@ -13,7 +13,7 @@ pub const c = @cImport({
     @cInclude("stdlib.h");
 });
 
-const CustomErr = error {
+pub const CustomErr = error {
     sqlErr,
     parameterErr
 };
@@ -37,6 +37,9 @@ pub fn executeQuery(allocator: Allocator,mysql: *c.MYSQL, query: [*c]const u8, p
         switch (err) {
             error.sqlErr => {
                 std.debug.panic("{s} - {s}\n", .{ c.mysql_sqlstate(mysql), c.mysql_error(mysql)});
+            },
+            error.parameterErr =>{
+                std.debug.panic("Expected number of parameters not met", .{});
             },
             else =>|e|{
                 return e;

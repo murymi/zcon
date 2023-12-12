@@ -13,8 +13,14 @@ pub fn main() !void {
 
     //const res = try connection.executeQuery("select * from users where name = ? and verified = ? and username = ?;", .{"karanja",7, "vic"});
     const statement = try connection.prepare("select * from users where name = ? and verified = ? and username = ?;");
-    const res = try statement.execute(.{"karanja",7, "vic"});
+    var res = try statement.execute(.{"karanja",7, "vic"});
     std.debug.print("{s}\n", .{res});
+
+    res = try statement.execute(.{"karanja", "vic"});
+
+    std.debug.print("{s}\n", .{res});
+
+    statement.close();
 
     //allocator.free(res);
 }
