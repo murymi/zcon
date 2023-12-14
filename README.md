@@ -2,10 +2,6 @@
 #### Disclaimer: This is just a simple project to learn zig. Even though it works, Use it at your own risk.
 works on  zig v0.12.0
 
-#### How to compile
-```shell
-zig run blabla.zig `mysql_config --libs` `mysql_config --cflags` -lc
-```
 #### single connection example
 ```zig
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -20,7 +16,7 @@ zig run blabla.zig `mysql_config --libs` `mysql_config --cflags` -lc
 
     const res = try connection.executeQuery("select ? as Greeting", .{"hello world"});
     res.deInit();
-    
+
     connection.close();
 ```
 
