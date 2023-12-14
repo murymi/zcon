@@ -2,6 +2,8 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const expect = std.testing.expect;
 const ArrayList = std.ArrayList;
+const json = std.json;
+const writeStream = json.writeStream;
 
 //This is a list to hold buffers when binding parameters and results
 pub const BuffList = struct {
@@ -153,6 +155,21 @@ pub const BuffList = struct {
         }
 
         return cp;
+    }
+
+    pub fn toString(self: *Self) ![]u8 {
+        var list = ArrayList(u8).init(self.allocator);
+        defer list.deinit();
+
+        var wr = writeStream(list.writer(), .{});
+        defer wr.deinit();
+
+        try wr.beginArray();
+        for(0..self.size)|i| {
+            try wr.write(self.getBufferAsString(i));
+        }
+        try wr.endArray();
+        return try self.allocator.dupe(u8, list.items);
     }
 };
 

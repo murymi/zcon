@@ -19,9 +19,8 @@ zig run blabla.zig `mysql_config --libs` `mysql_config --cflags` -lc
            });
 
     const res = try connection.executeQuery("select ? as Greeting", .{"hello world"});
-    defer allocator.free(res);
-    std.debug.print("{s}\n", .{res});
-
+    res.deInit();
+    
     connection.close();
 ```
 
@@ -40,8 +39,7 @@ zig run blabla.zig `mysql_config --libs` `mysql_config --cflags` -lc
            4);
 
     const res = try pool.executeQuery("select ? as Greeting", .{"hello world"});
-    defer allocator.free(res);
-    std.debug.print("{s}\n", .{res});
+    res.deInit();
 
     pool.deInit();
 ```
@@ -63,9 +61,7 @@ zig run blabla.zig `mysql_config --libs` `mysql_config --cflags` -lc
     const res = try pool.executeQuery("select ? as Greeting", .{"hello world"});
 
     // free result
-    defer allocator.free(res);
-
-    std.debug.print("{s}\n", .{res});
+    res.deInit();
 
     //free pool
     pool.deInit();
@@ -92,12 +88,7 @@ zig run blabla.zig `mysql_config --libs` `mysql_config --cflags` -lc
     defer pool.dropConnection(connection);
 
     //query
-    const res = try connection.executeQuery("select ? as Greeting", .{"hello world"});
-
-    // free result
-    defer allocator.free(res);
-
-    std.debug.print("{s}\n", .{res});
+    _ = try connection.executeQuery("select ? as Greeting", .{"hello world"});
 
     //free pool
     pool.deInit();
@@ -133,7 +124,14 @@ zig run blabla.zig `mysql_config --libs` `mysql_config --cflags` -lc
     // free result
     defer allocator.free(res);
 
-    std.debug.print("{s}\n", .{res});
+    if(res2.nextResultSet()) |re| {
+        while(re.nextRow()) |ro| {
+            for(0..ro.colCount) |i| {
+                std.debug.print("{s}\n", .{try ro.columns.?.get(i)});
+            }
+        }
+
+    }
 
     connection.close();
 ```
@@ -164,13 +162,20 @@ zig run blabla.zig `mysql_config --libs` `mysql_config --cflags` -lc
     var res = try stmt.execute(.{"hello world"});
 
     // free result
-    defer allocator.free(res);
+    res.deInit();
 
-    std.debug.print("{s}\n", .{res});
+    if(res2.nextResultSet()) |re| {
+        while(re.nextRow()) |ro| {
+            const d = try ro.columns.?.toString();
+            defer allocator.free(d);
+            std.debug.print("{s}\n", .{d});
+        }
+
+    }
 
     //free pool
     pool.deInit();
 ```
 
 #### Known bugs
-Trying to prepare a statement from a connection that has already been used for normal query is an error.
+you need to free everything.

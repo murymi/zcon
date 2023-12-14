@@ -3,6 +3,7 @@ const conn = @import("connection.zig");
 const Allocator = std.mem.Allocator;
 const pool = @import("pool.zig");
 const config = .{ .databaseName = "events", .host = "localhost", .password = "1234Victor", .username = "vic" };
+const json = std.json;
 
 test "test" {
     //var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -12,7 +13,7 @@ test "test" {
     defer connection.close();
 
 
-    const statement = try connection.prepare("select * from users");
+    const statement = try connection.prepare("select name, username, email, verified from users limit 10");
     defer statement.close();
 
     const tm = std.time.Timer;
@@ -22,8 +23,9 @@ test "test" {
     
     if(res2.nextResultSet()) |re| {
         while(re.nextRow()) |ro| {
-        
-            std.debug.print("{any}\n", .{ro.columns});
+            const d = try ro.columns.?.toString();
+            defer allocator.free(d);
+            std.debug.print("{s}\n", .{d});
         }
 
     }

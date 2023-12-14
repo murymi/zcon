@@ -322,7 +322,7 @@ pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT,parameters: an
     const resultSet1 = try r.ResultSet.init(allocator);
 
     while (c.mysql_stmt_fetch(statement) == @as(c_int, 0)) {
-        const row = try r.Row.init(allocator);
+        const row = try r.Row.init(allocator, columnCount);
         row.columns = try resultBuffers.clone();
         resultSet1.insertRow(row);
     }

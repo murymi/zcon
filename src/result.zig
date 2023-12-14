@@ -8,10 +8,11 @@ pub const Row = struct {
     nextRow: ?*Row,
     columns: ?*ArrayList,
     allocator: Allocator,
+    colCount: usize,
 
-    pub fn init(allocator: Allocator) !*Self {
+    pub fn init(allocator: Allocator, columnCount: usize) !*Self {
         const r = try allocator.create(Self);
-        r.* = .{ .nextRow = null, .columns = null, .allocator = allocator };
+        r.* = .{ .nextRow = null, .columns = null, .allocator = allocator, .colCount = columnCount};
 
         return r;
     }
@@ -173,18 +174,18 @@ test " " {
 
     try std.testing.expect(a == null);
 
-    const row1 = try Row.init(allocator);
-    const row2 = try Row.init(allocator);
-    const row3 = try Row.init(allocator);
+    const row1 = try Row.init(allocator,5);
+    const row2 = try Row.init(allocator,5);
+    const row3 = try Row.init(allocator,5);
 
-    const row4 = try Row.init(allocator);
-    const row5 = try Row.init(allocator);
-    const row6 = try Row.init(allocator);
+    const row4 = try Row.init(allocator,5);
+    const row5 = try Row.init(allocator,5);
+    const row6 = try Row.init(allocator,5);
 
 
-    const row7 = try Row.init(allocator);
-    const row8 = try Row.init(allocator);
-    const row9 = try Row.init(allocator);
+    const row7 = try Row.init(allocator,5);
+    const row8 = try Row.init(allocator,5);
+    const row9 = try Row.init(allocator,5);
 
 
 
