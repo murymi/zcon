@@ -86,6 +86,7 @@ pub const Result = struct {
     firstSet: ?*ResultSet,
     allocator: Allocator,
     nextRSet: ?*ResultSet,
+    affectedRows: usize,
 
     pub fn init(allocator: Allocator) !*Self {
         const r = try allocator.create(Self);
@@ -94,7 +95,8 @@ pub const Result = struct {
             .resultSets = null,
             .firstSet = null,
             .nextRSet = null,
-            .allocator = allocator
+            .allocator = allocator,
+            .affectedRows = 0
         };
 
         return r;

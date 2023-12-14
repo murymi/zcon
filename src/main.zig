@@ -13,13 +13,15 @@ test "test" {
     defer connection.close();
 
 
-    const statement = try connection.prepare("select ? as test");
+    const statement = try connection.prepare("delete from users where username = 'oya'");
     defer statement.close();
 
     const tm = std.time.Timer;
     var start = try tm.start();
-    const res2 = try statement.execute(.{"failed"});
+    const res2 = try statement.execute(.{});
     const end = start.read();
+
+    std.debug.print("Affected rows => {}\n", .{res2.affectedRows});
     
     if(res2.nextResultSet()) |re| {
         while(re.nextRow()) |ro| {

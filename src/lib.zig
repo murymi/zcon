@@ -231,20 +231,12 @@ pub fn bindResultBuffers(allocator: Allocator,
 }
 
 // get affected rows for querys that do not return results
-pub fn getAffectedRows(allocator: Allocator, statement: *c.MYSQL_STMT) ![]u8 {
-    var list: ArrayList(u8) = ArrayList(u8).init(allocator);
-    defer list.deinit();
-
-    var wr = writeStream(list.writer(), .{ .whitespace = .indent_1 });
-    defer wr.deinit();
-
-    try wr.beginObject();
-    try wr.objectField("Affected rows");
+pub fn getAffectedRows(allocator: Allocator, statement: *c.MYSQL_STMT) !*r.Result {
+    const res = try r.Result.init(allocator);
     const affectedRows = c.mysql_stmt_affected_rows(statement);
-    try wr.write(affectedRows);
-    try wr.endObject();
+    res.affectedRows = @intCast(affectedRows);
 
-    return try allocator.dupe(u8, list.items);
+    return res;
 }
 
 // Fetching and structuring results to json
@@ -282,21 +274,22 @@ pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT,parameters: an
         }
     }
 
-    var metadata: *c.MYSQL_RES = undefined;
+    var metadata: ?*c.MYSQL_RES = null;
+
     defer {
-        if(metadata != undefined){
-            _ = c.mysql_free_result(metadata);
+        if(metadata) |m| {
+           _ = c.mysql_free_result(m);
         }
     }
 
     if(getResultMetadata(statement)) |val| {
         metadata = val;
     } else |_|{
-        return error.connectionDirty;
-        //try getAffectedRows(allocator, statement);
+        //metadata = undefined;
+        return try getAffectedRows(allocator, statement);
     }
 
-    const columnCount = getColumnCount(metadata);
+    const columnCount = getColumnCount(metadata.?);
 
     // holds lengths of each column
     var resLengths = try allocator.alloc(c_ulong, columnCount);
@@ -311,7 +304,7 @@ pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT,parameters: an
     defer allocator.free(resErrs);
 
 
-    const columns = try getColumns(metadata);
+    const columns = try getColumns(metadata.?);
 
     var resBind: [*c]c.MYSQL_BIND = undefined;
     const resultBuffers = try bindResultBuffers(allocator,statement, columns, columnCount, &resBind, &resLengths,@ptrCast(&resNulls), @ptrCast(&resErrs));
