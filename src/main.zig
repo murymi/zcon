@@ -4,19 +4,31 @@ const Allocator = std.mem.Allocator;
 const pool = @import("pool.zig");
 const config = .{ .databaseName = "events", .host = "localhost", .password = "1234Victor", .username = "vic" };
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
+test "test" {
+    //var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = std.testing.allocator;
+    //gpa.allocator();
     const connection = try conn.Connection.newConnection(allocator, config);
     defer connection.close();
 
-    const res = try connection.executeQuery("select * from users where name = ?", .{"karanja"});
-    _ = res;
-    //std.debug.print("{s}\n", .{res});
 
-    const statement = try connection.prepare("call massive_test()");
+    const statement = try connection.prepare("select * from users");
     defer statement.close();
-    const res2 = try statement.execute(.{});
 
-    std.debug.print("{s} {}\n", .{res2, res2.len});
+    const tm = std.time.Timer;
+    var start = try tm.start();
+    const res2 = try statement.execute(.{});
+    const end = start.read();
+    
+    if(res2.nextResultSet()) |re| {
+        while(re.nextRow()) |ro| {
+        
+            std.debug.print("{any}\n", .{ro.columns});
+        }
+
+    }
+
+    res2.deinit();
+    std.debug.print("Taken {}ms\n", .{end/1000000});
+
 }

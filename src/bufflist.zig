@@ -63,30 +63,44 @@ pub const BuffList = struct {
     }
 
     //Get Z type buffer at pos
-    pub fn getBuffer(self :*Self, pos :usize) !*[]u8 {
-        try expect(self.size > pos);
+    pub fn getBuffer(self :*Self, pos :usize) ?*[] u8 {
+
+        if(self.size < pos){
+            return null;
+        }
+
         var ntmp = self.first;
         for(0..pos) |_| {
             ntmp = ntmp.?.next;
         }
 
-        return &(ntmp.?.data.?);
+        const a = ntmp.?.data;
+        if(a) |ptr|{
+            return @constCast(&ptr);
+        }else {
+            return null;
+        }
     }
 
     //get C type buffer at pos
-    pub fn getCBuffer(self :*Self, pos :usize) !?*anyopaque {
-        const b = try self.getBuffer(pos);
-        return @as(?*anyopaque,@ptrCast(@as([*c]u8 ,@ptrCast(@constCast( @alignCast( b.*))))));
+    pub fn getCBuffer(self :*Self, pos :usize) ?*anyopaque {
+        if(self.getBuffer(pos)) |val| {
+            return @as(?*anyopaque,@ptrCast(@as([*c]u8 ,@ptrCast(@constCast( @alignCast( val.*))))));
+        } else {
+            return null;
+        }
     }
 
     //copy string data to buffer at pos
     pub fn setBuffer(self :*Self, data: []const u8, pos :usize) !void {
-        const tpl = try self.getBuffer(pos);
+        const tpl = self.getBuffer(pos);
 
-        try expect(tpl.len >= data.len);
+        if(tpl)|val| {
+            try expect(val.len >= data.len);
 
-        for(data, 0..)|b,i|{
-            tpl.*[i] = b;
+            for(data, 0..)|b,i|{
+                val.*[i] = b;
+            }
         }
 
     }
@@ -97,10 +111,14 @@ pub const BuffList = struct {
         try self.setBuffer(data, pos);  
     }
 
-    //Get buffer as Zig string
-    pub fn getBufferAsString(self :*Self,pos :usize) ![] u8 {
-        const buff = try self.getBuffer(pos);
-        return std.mem.sliceTo(buff.*, 0);
+    /// Get buffer as Zig string
+    pub fn getBufferAsString(self :*Self,pos :usize) ?[] u8 {
+        const buff = self.getBuffer(pos);
+        if(buff) |val| {
+            return std.mem.sliceTo(val.*, 0);
+        }
+
+        return null;
     }
 
     //Get buffer casted to C string
@@ -123,6 +141,19 @@ pub const BuffList = struct {
 
         self.allocator.destroy(self);
     }
+
+    pub fn clone(self: *Self) !*Self {
+        const cp = try Self.init(self.allocator, self.size);
+
+        for(0..self.size)|i|{
+
+            if(self.getBufferAsString(i))|val|{
+                try cp.initAndSetBuffer(val, i);
+            }
+        }
+
+        return cp;
+    }
 };
 
 
@@ -130,10 +161,18 @@ test "buff" {
     const x = try BuffList.init(std.testing.allocator, 3);
     try x.initAndSetBuffer("hello world", 2);
 
-    const str = try x.getBufferAsString(2);
-    var cstr = @as(?*anyopaque,@ptrCast(@as([*c]u8 ,@ptrCast(@constCast( @alignCast(str))))));
+    const str = x.getBufferAsString(2);
+    var cstr = @as(?*anyopaque,@ptrCast(@as([*c]u8 ,@ptrCast(@constCast( @alignCast(str.?))))));
 
     cstr = @as(?*anyopaque,@ptrCast(@as([*c]u8 ,@ptrCast(@constCast( @alignCast("hello"))))));
+
+    const clone = try x.clone();
+    defer clone.deInit();
+
+    const str2 = clone.getBufferAsString(2);
+
+    try expect(std.mem.eql(u8, str.?,str2.?));
+
 
     defer x.deInit();
 }

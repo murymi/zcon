@@ -3,6 +3,7 @@ const c = lib.c;
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const err = lib.CustomErr;
+const r = @import("result.zig");
 
 pub const Statement = struct {
     const Self = @This();
@@ -32,7 +33,7 @@ pub const Statement = struct {
         self.allocator.destroy(self);
     }
 
-    pub fn execute(self: *Self, params: anytype) ![]u8 {
+    pub fn execute(self: *Self, params: anytype) !*r.Result {
         if(lib.fetchResults(self.allocator, self.stmt, params)) |ptr| {
             return ptr;
         } else |e|{

@@ -1,38 +1,42 @@
 const std = @import("std");
-const ArrayList = std.ArrayListAligned(u8, null);
+const ArrayList = @import("lib.zig").Bufflist;
 const Allocator = std.mem.Allocator;
 
-const Row = struct {
+pub const Row = struct {
     const Self = @This();
 
     nextRow: ?*Row,
-    columns: ArrayList,
+    columns: ?*ArrayList,
     allocator: Allocator,
 
     pub fn init(allocator: Allocator) !*Self {
         const r = try allocator.create(Self);
-        r.* = .{ .nextRow = null, .columns = std.ArrayList(u8).init(allocator), .allocator = allocator };
+        r.* = .{ .nextRow = null, .columns = null, .allocator = allocator };
 
         return r;
     }
 
     pub fn deInit(self: *Self) void {
-        self.columns.deinit();
+        if(self.columns) |c| {
+            c.deInit();
+        }
+
         self.allocator.destroy(self);
     }
 };
 
-const ResultSet = struct {
+pub const ResultSet = struct {
     const Self = @This();
 
     nextSet: ?*Self,
     firstRow: ?*Row,
+    currentRow: ?*Row,
 
     allocator: Allocator,
 
     pub fn init(allocator: Allocator) !*Self {
         const rs = try allocator.create(Self);
-        rs.* = .{ .nextSet = null, .firstRow = null,  .allocator = allocator };
+        rs.* = .{ .nextSet = null, .firstRow = null,  .allocator = allocator , .currentRow = null };
         return rs;
     }
 
@@ -42,6 +46,7 @@ const ResultSet = struct {
 
         if(fr) |_| {} else {
             self.firstRow = row;
+            self.currentRow = row;
             return;
         }
 
@@ -62,14 +67,24 @@ const ResultSet = struct {
 
         self.allocator.destroy(self);
     }
+
+    pub fn nextRow(self: *Self) ?*Row {
+        if(self.currentRow)|ptr| {
+           self.currentRow = ptr.nextRow orelse null;
+            return ptr;
+        }
+
+        return null;
+    }
 };
 
-const Result = struct {
+pub const Result = struct {
     const Self = @This();
 
     resultSets: ?*ResultSet,
     firstSet: ?*ResultSet,
     allocator: Allocator,
+    nextRSet: ?*ResultSet,
 
     pub fn init(allocator: Allocator) !*Self {
         const r = try allocator.create(Self);
@@ -77,6 +92,7 @@ const Result = struct {
         r.* = .{
             .resultSets = null,
             .firstSet = null,
+            .nextRSet = null,
             .allocator = allocator
         };
 
@@ -86,6 +102,7 @@ const Result = struct {
     pub fn insert(self: *Self, set: *ResultSet) void {
         if(self.firstSet) |_|{} else {
             self.firstSet = set;
+            self.nextRSet = set;
             return;
         }
 
@@ -102,12 +119,20 @@ const Result = struct {
         var fs = self.firstSet;
         while(fs) |ptr| {
             fs = ptr.nextSet;
-            //self.allocator.destroy(ptr);
             ptr.deInit();
         }
 
         self.allocator.destroy(self);
     }
+
+    pub fn nextResultSet(self: *Self) ?*ResultSet {
+        if(self.nextRSet)|ptr| {
+           self.nextRSet = ptr.nextSet orelse null;
+            return ptr;
+        }
+
+        return null;
+    } 
 };
 
 
@@ -117,16 +142,36 @@ test " " {
     // = gpa.allocator();
 
     const res = try Result.init(allocator);
+    var a = res.nextResultSet();
+
+    try std.testing.expect(a == null);
 
     const set1 = try ResultSet.init(allocator);
     const set2 = try ResultSet.init(allocator);
+    //_ = set2;
     const set3 = try ResultSet.init(allocator);
+    //_ = set3;
 
 
 
     res.insert(set1);
     res.insert(set2);
     res.insert(set3);
+
+    a = res.nextResultSet();
+    try std.testing.expect(a == set1);
+
+    a = res.nextResultSet();
+    try std.testing.expect(set1.nextSet == set2);
+    try std.testing.expect(a == set2);
+
+    a = res.nextResultSet();
+    try std.testing.expect(set2.nextSet == set3);
+    try std.testing.expect(a == set3);
+
+    a = res.nextResultSet();
+
+    try std.testing.expect(a == null);
 
     const row1 = try Row.init(allocator);
     const row2 = try Row.init(allocator);
@@ -145,7 +190,6 @@ test " " {
 
 
 
-
     set1.insertRow(row1);
     set1.insertRow(row2);
     set1.insertRow(row3);
@@ -158,6 +202,25 @@ test " " {
     set3.insertRow(row8);
     set3.insertRow(row9);
 
+    var r1 = set1.nextRow();
+    try  std.testing.expect(r1 == row1);
+    r1 = set1.nextRow();
+    try  std.testing.expect(r1 == row2);
+    r1 = set1.nextRow();
+    try  std.testing.expect(r1 == row3);
+    r1 = set1.nextRow();
+    try  std.testing.expect(r1 == null);
+    r1 = set1.nextRow();
+    try  std.testing.expect(r1 == null);
+
+    //try  std.testing.expect(r1 == null);
+    //try row1.columns.append("hello");
+    //try row1.columns.append("world");
+    //try row1.columns.append("bashment");
+
+    //try std.testing.expect(std.mem.eql(u8,row1.columns.getLast(), "bashment")); 
+
+    //try std.testing.expect(row1.columns.capacity == 1);
 
     res.deinit();
 

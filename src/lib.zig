@@ -1,12 +1,13 @@
 const std = @import("std");
 const os = std.os;
-const Bufflist = @import("bufflist.zig").BuffList;
+pub const Bufflist = @import("bufflist.zig").BuffList;
 const ArrayList = std.ArrayList;
 const json = std.json;
 const writeStream = json.writeStream;
 const Allocator = std.mem.Allocator;
 const time = std.time;
 const expect = std.testing.expect;
+const r = @import("result.zig");
 
 pub const c = @cImport({
     @cInclude("mysql.h");
@@ -29,7 +30,7 @@ pub const ConnectionConfig = struct {
 };
 
 //Execute query, results in json
-pub fn executeQuery(allocator: Allocator,mysql: *c.MYSQL, query: [*c]const u8, parameters: anytype) ![]u8 {
+pub fn executeQuery(allocator: Allocator,mysql: *c.MYSQL, query: [*c]const u8, parameters: anytype) !*r.Result {
     // create statement
     const statement = try prepareStatement(mysql, query);
     defer {
@@ -214,7 +215,7 @@ pub fn bindResultBuffers(allocator: Allocator,
         toBind.*[i].buffer_type = c.MYSQL_TYPE_STRING;
         const len = @as(usize, (columns.?[i]).length);
         try blist.initBuffer(i, len);
-        toBind.*[i].buffer = try blist.getCBuffer(i);
+        toBind.*[i].buffer = blist.getCBuffer(i);
         toBind.*[i].buffer_length = len;
         toBind.*[i].length = &(lengths.*[i]);
         toBind.*[i].@"error" = &(errors.*[i]);
@@ -247,7 +248,97 @@ pub fn getAffectedRows(allocator: Allocator, statement: *c.MYSQL_STMT) ![]u8 {
 }
 
 // Fetching and structuring results to json
-pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT,parameters: anytype) ![]u8 {
+pub fn fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT,parameters: anytype) !*r.Result {
+    // parameter buffer list
+    var pbuff: ?*Bufflist = null;
+
+    // structs to bind each parameter to.
+    var binded: ?[*c]c.MYSQL_BIND = null;
+
+    // holds lengths of parameters when binding
+    var lengths = try allocator.alloc(c_ulong, parameters.len);
+    defer allocator.free(lengths);
+
+    defer {
+        if(binded)|ptr|{
+            c.free(@as(?*anyopaque,@ptrCast(ptr)));
+        }
+
+        if(pbuff)|ptr|{
+            ptr.deInit();
+        }
+    }
+
+    // check if parameters are given for binding, else skip binding and only execute statement
+    switch(parameters.len > 0){
+        true => { 
+            pbuff = try fillParamsList(allocator,parameters);
+
+            binded = try bindParametersToStatement(statement, pbuff.?,&lengths);
+        },
+        else => {
+            // execute statement 
+           try executeStatement(statement);
+        }
+    }
+
+    var metadata: *c.MYSQL_RES = undefined;
+    defer {
+        if(metadata != undefined){
+            _ = c.mysql_free_result(metadata);
+        }
+    }
+
+    if(getResultMetadata(statement)) |val| {
+        metadata = val;
+    } else |_|{
+        return error.connectionDirty;
+        //try getAffectedRows(allocator, statement);
+    }
+
+    const columnCount = getColumnCount(metadata);
+
+    // holds lengths of each column
+    var resLengths = try allocator.alloc(c_ulong, columnCount);
+    defer allocator.free(resLengths);
+
+    // holds nullabilty of each col
+    var resNulls = try allocator.alloc(bool, columnCount);
+    defer allocator.free(resNulls);
+
+    // holds errors of each col
+    var resErrs = try allocator.alloc(bool, columnCount);
+    defer allocator.free(resErrs);
+
+
+    const columns = try getColumns(metadata);
+
+    var resBind: [*c]c.MYSQL_BIND = undefined;
+    const resultBuffers = try bindResultBuffers(allocator,statement, columns, columnCount, &resBind, &resLengths,@ptrCast(&resNulls), @ptrCast(&resErrs));
+    defer resultBuffers.deInit();
+
+    const res = try r.Result.init(allocator);
+
+    const resultSet1 = try r.ResultSet.init(allocator);
+
+    while (c.mysql_stmt_fetch(statement) == @as(c_int, 0)) {
+        const row = try r.Row.init(allocator);
+        row.columns = try resultBuffers.clone();
+        resultSet1.insertRow(row);
+    }
+
+    res.insert(resultSet1);
+
+    //ToDo
+    // for handling multiple result sets
+    while (c.mysql_stmt_next_result(statement) == @as(c_int, 0)) {}
+
+    return res;
+    //try allocator.dupe(u8, list.items);
+}
+
+
+pub fn _fetchResults(allocator: Allocator,statement: *c.MYSQL_STMT,parameters: anytype) ![]u8 {
     // parameter buffer list
     var pbuff: ?*Bufflist = null;
 
