@@ -118,7 +118,7 @@ pub fn bindParametersToStatement(statement: ?*c.MYSQL_STMT, parameterList: *Buff
         var p_bind: [*c]c.MYSQL_BIND = @as([*c]c.MYSQL_BIND, @ptrCast(@alignCast(c.malloc(@sizeOf(c.MYSQL_BIND) *% @as(c_ulong, parameterList.size)))));
 
         for (0..param_count)|i|{       
-            const wcd = try parameterList.getBufferAsString(i);
+            const wcd = parameterList.getBufferAsString(i).?;
             lengths.*[i] = @as(c_ulong,wcd.len);
             const bf = @as(?*anyopaque,@ptrCast(@as([*c]u8 ,@ptrCast(@constCast( @alignCast(wcd))))));
 

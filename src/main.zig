@@ -13,12 +13,12 @@ test "test" {
     defer connection.close();
 
 
-    const statement = try connection.prepare("select name, username, email, verified from users limit 10");
+    const statement = try connection.prepare("select ? as test");
     defer statement.close();
 
     const tm = std.time.Timer;
     var start = try tm.start();
-    const res2 = try statement.execute(.{});
+    const res2 = try statement.execute(.{"failed"});
     const end = start.read();
     
     if(res2.nextResultSet()) |re| {
