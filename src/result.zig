@@ -86,7 +86,7 @@ pub const Result = struct {
     firstSet: ?*ResultSet,
     allocator: Allocator,
     nextRSet: ?*ResultSet,
-    affectedRows: usize,
+    affectedRows: u64,
 
     pub fn init(allocator: Allocator) !*Self {
         const r = try allocator.create(Self);

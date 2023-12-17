@@ -13,17 +13,16 @@ test "test" {
     defer connection.close();
 
 
-    const statement = try connection.prepare("delete from users where username = 'oya'");
+    const statement = try connection.prepare("call massive_test()");
     defer statement.close();
 
     const tm = std.time.Timer;
     var start = try tm.start();
     const res2 = try statement.execute(.{});
     const end = start.read();
-
-    std.debug.print("Affected rows => {}\n", .{res2.affectedRows});
     
-    if(res2.nextResultSet()) |re| {
+    while(res2.nextResultSet()) |re| {
+        std.debug.print("=====================================\n", .{});
         while(re.nextRow()) |ro| {
             const d = try ro.columns.?.toString();
             defer allocator.free(d);
