@@ -114,7 +114,7 @@ pub const BuffList = struct {
     }
 
     /// Get buffer as Zig string
-    pub fn getBufferAsString(self :*Self,pos :usize) ?[] u8 {
+    pub fn get(self :*Self,pos :usize) ?[] u8 {
         const buff = self.getBuffer(pos);
         if(buff) |val| {
             return std.mem.sliceTo(val.*, 0);
@@ -149,7 +149,7 @@ pub const BuffList = struct {
 
         for(0..self.size)|i|{
 
-            if(self.getBufferAsString(i))|val|{
+            if(self.get(i))|val|{
                 try cp.initAndSetBuffer(val, i);
             }
         }
@@ -166,7 +166,7 @@ pub const BuffList = struct {
 
         try wr.beginArray();
         for(0..self.size)|i| {
-            try wr.write(self.getBufferAsString(i));
+            try wr.write(self.get(i));
         }
         try wr.endArray();
         return try self.allocator.dupe(u8, list.items);
@@ -178,7 +178,7 @@ test "buff" {
     const x = try BuffList.init(std.testing.allocator, 3);
     try x.initAndSetBuffer("hello world", 2);
 
-    const str = x.getBufferAsString(2);
+    const str = x.get(2);
     var cstr = @as(?*anyopaque,@ptrCast(@as([*c]u8 ,@ptrCast(@constCast( @alignCast(str.?))))));
 
     cstr = @as(?*anyopaque,@ptrCast(@as([*c]u8 ,@ptrCast(@constCast( @alignCast("hello"))))));
@@ -186,7 +186,7 @@ test "buff" {
     const clone = try x.clone();
     defer clone.deInit();
 
-    const str2 = clone.getBufferAsString(2);
+    const str2 = clone.get(2);
 
     try expect(std.mem.eql(u8, str.?,str2.?));
 

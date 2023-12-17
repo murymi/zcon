@@ -19,11 +19,10 @@ test "test" {
     const tm = std.time.Timer;
     var start = try tm.start();
     //const res2 = try statement.execute(.{});
-    const res = try connection.executeQuery("select * from users limit 5",.{});
+    const res = try connection.executeQuery("select * from users limit ?",.{5});
     const end = start.read();
     
     while(res.nextResultSet()) |re| {
-        std.debug.print("=====================================\n", .{});
         while(re.nextRow()) |ro| {
             const d = try ro.columns.?.toString();
             defer allocator.free(d);

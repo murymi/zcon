@@ -121,7 +121,7 @@ pub fn bindParametersToStatement(statement: ?*c.MYSQL_STMT, parameterList: *Buff
     var p_bind: [*c]c.MYSQL_BIND = @as([*c]c.MYSQL_BIND, @ptrCast(@alignCast(c.malloc(@sizeOf(c.MYSQL_BIND) *% @as(c_ulong, parameterList.size)))));
 
     for (0..param_count) |i| {
-        const wcd = parameterList.getBufferAsString(i).?;
+        const wcd = parameterList.get(i).?;
         lengths.*[i] = @as(c_ulong, wcd.len);
         const bf = @as(?*anyopaque, @ptrCast(@as([*c]u8, @ptrCast(@constCast(@alignCast(wcd))))));
 
@@ -328,7 +328,6 @@ pub fn fetchResults(allocator: Allocator, statement: *c.MYSQL_STMT, parameters: 
     res.affectedRows = getAffectedRows(statement);
 
     return res;
-    //try allocator.dupe(u8, list.items);
 }
 
 pub fn fetchResults2(allocator: Allocator, mysql: *c.MYSQL, query: [*c]const u8) !*r.Result {
@@ -363,9 +362,9 @@ pub fn fetchResults2(allocator: Allocator, mysql: *c.MYSQL, query: [*c]const u8)
                     rw.columns = try Bufflist.init(allocator, numFields);
 
                     for (0..numFields) |i| {
-                        if(row[i] != null){
+                        if(row[i] != null) {
                             try rw.columns.?.initAndSetBuffer(row[i][0..lengths[i]], i);
-                        }else{
+                        } else {
                             try rw.columns.?.initAndSetBuffer("", i);
                         }   
                     }
