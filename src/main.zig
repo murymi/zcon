@@ -13,15 +13,16 @@ test "test" {
     defer connection.close();
 
 
-    const statement = try connection.prepare("call massive_test()");
-    defer statement.close();
+    //const statement = try connection.prepare("select * from users;");
+    //defer statement.close();
 
     const tm = std.time.Timer;
     var start = try tm.start();
-    const res2 = try statement.execute(.{});
+    //const res2 = try statement.execute(.{});
+    const res = try connection.executeQuery("select * from users limit 5",.{});
     const end = start.read();
     
-    while(res2.nextResultSet()) |re| {
+    while(res.nextResultSet()) |re| {
         std.debug.print("=====================================\n", .{});
         while(re.nextRow()) |ro| {
             const d = try ro.columns.?.toString();
@@ -31,7 +32,7 @@ test "test" {
 
     }
 
-    res2.deinit();
+    res.deinit();
     std.debug.print("Taken {}ms\n", .{end/1000000});
 
 }

@@ -31,13 +31,19 @@ pub const ConnectionConfig = struct {
 
 //Execute query, results in json
 pub fn executeQuery(allocator: Allocator, mysql: *c.MYSQL, query: [*c]const u8, parameters: anytype) !*r.Result {
+
+    if(parameters.len == 0){
+        return try fetchResults2(allocator, mysql, query);
+    }
+
+
     // create statement
     const statement = try prepareStatement(mysql, query);
     defer {
         _ = c.mysql_stmt_close(@ptrCast(statement));
     }
-
-    // fetch resulst
+    
+    //fetch resulst
     if (fetchResults(allocator, statement, parameters)) |res| {
         return res;
     } else |err| {
@@ -54,9 +60,9 @@ pub fn executeQuery(allocator: Allocator, mysql: *c.MYSQL, query: [*c]const u8, 
             },
         }
     }
-
-    //_= c.mysql_stmt_close(statement);
-}
+    
+    _= c.mysql_stmt_close(statement);
+} //
 
 //create C connection struct
 pub fn initConnection(config: ConnectionConfig) CustomErr!*c.MYSQL {
@@ -225,7 +231,8 @@ pub fn getAffectedRows(statement: *c.MYSQL_STMT) u64 {
     return affectedRows;
 }
 
-// Fetching and structuring results to json
+// fetch for prepared statements
+
 pub fn fetchResults(allocator: Allocator, statement: *c.MYSQL_STMT, parameters: anytype) !*r.Result {
     // parameter buffer list
     var pbuff: ?*Bufflist = null;
@@ -265,7 +272,6 @@ pub fn fetchResults(allocator: Allocator, statement: *c.MYSQL_STMT, parameters: 
     //problem starts here
 
     while (true) {
-
         var metadata: ?*c.MYSQL_RES = null;
 
         defer {
@@ -323,6 +329,75 @@ pub fn fetchResults(allocator: Allocator, statement: *c.MYSQL_STMT, parameters: 
 
     return res;
     //try allocator.dupe(u8, list.items);
+}
+
+pub fn fetchResults2(allocator: Allocator, mysql: *c.MYSQL, query: [*c]const u8) !*r.Result {
+
+    var status = c.mysql_query(mysql, query);
+
+    if (status != @as(c_int, 0)) {
+        return error.sqlErr;
+    }
+
+    const res = try r.Result.init(allocator);
+
+    while (true) {
+
+        const result = c.mysql_store_result(mysql);
+
+        const resultSet = try r.ResultSet.init(allocator);
+
+        if (result != null) {
+
+            const numFields = c.mysql_num_fields(result);
+
+            while (true) {
+                const row = c.mysql_fetch_row(result);
+
+
+                if (row != null) {
+                    const rw = try r.Row.init(allocator, numFields);
+
+                    const lengths: [*c]c_ulong = c.mysql_fetch_lengths(result);
+
+                    rw.columns = try Bufflist.init(allocator, numFields);
+
+                    for (0..numFields) |i| {
+                        if(row[i] != null){
+                            try rw.columns.?.initAndSetBuffer(row[i][0..lengths[i]], i);
+                        }else{
+                            try rw.columns.?.initAndSetBuffer("", i);
+                        }   
+                    }
+
+                    resultSet.insertRow(rw);
+
+                }else{ break; }
+
+            }
+
+            res.insert(resultSet);
+            c.mysql_free_result(result);
+
+        } else
+        {
+            if (c.mysql_field_count(mysql) == 0) {
+                res.affectedRows += c.mysql_affected_rows(mysql);
+            } else {
+                break {
+                    return error.sqlErr;
+                };
+            }
+        }
+        
+        status = c.mysql_next_result(mysql);
+
+        if (status != 0) {
+            break;
+        }
+    }
+
+    return res;
 }
 
 pub fn cStringToZigString(cString: [*]const u8, allocator: Allocator) ![]const u8 {
