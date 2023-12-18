@@ -22,6 +22,15 @@ pub const CustomErr = error{
     connectionDirty,
 };
 
+
+pub const User = struct {
+    username: [*c]const u8,
+    password: [*c]const u8,
+
+    /// Assign null if you do not want to have a default database.
+    database: ?[*c]const u8
+};
+
 pub const ConnectionConfig = struct {
     host: [*c]const u8,
     username: [*c]const u8,

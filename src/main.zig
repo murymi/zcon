@@ -20,22 +20,26 @@ test "test" {
 
     const connection = pl.getConnection();
 
-    const tm = std.time.Timer;
-    var start = try tm.start();
+    _ = connection.changeUser(.{ .username = "vic", .database = "events", .password = "1234Victor"});
+    _ = connection.setAutoCommitMode(false);
+    _ = connection.getAffectedRows();
+    const charset = connection.getCharacterSetName();
+    //const tm = std.time.Timer;
+    //var start = try tm.start();
     //const res2 = try statement.execute(.{});
-    const res = try connection.executeQuery("select * from users limit ?",.{5});
-    const end = start.read();
-    
-    while(res.nextResultSet()) |re| {
-        while(re.nextRow()) |ro| {
-            const d = try ro.columns.?.toString();
-            defer allocator.free(d);
-            std.debug.print("{s}\n", .{d});
-        }
-
-    }
-
-    res.deinit();
-    std.debug.print("Taken {}ms\n", .{end/1000000});
+    //const res = try connection.executeQuery("select * from users limit ?",.{5});
+    //const end = start.read();
+    //
+    //while(res.nextResultSet()) |re| {
+    //    while(re.nextRow()) |ro| {
+    //        const d = try ro.columns.?.toString();
+    //        defer allocator.free(d);
+    //        std.debug.print("{s}\n", .{d});
+    //    }
+//
+    //}
+//
+    //res.deinit();
+    std.debug.print("Taken {s} ms\n", .{charset});
 
 }

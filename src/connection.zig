@@ -51,6 +51,43 @@ pub const Connection = struct {
         //if(self.dirty) return error.connectionDirty;
         return try Statement.init(self.allocator,self.mysql, query);
     }
+
+    /// Returns the number of rows changed, deleted, or
+    /// inserted by the last statement if it was an UPDATE, DELETE, or INSERT. For SELECT statements,
+    /// it returns number of rows fetched.
+    pub fn getAffectedRows(self: *Self) u64 {
+        return c.mysql_affected_rows(self.mysql);
+    }
+
+    /// Sets autocommit mode on if mode is true, off if mode is false.
+    /// returns true for success
+    pub fn setAutoCommitMode(self: *Self, mode: bool) bool {
+        return c.mysql_autocommit(self.mysql, mode);
+    }
+
+    /// Changes the user and causes the database specified by db to become the default (current) database
+    /// on the connection specified. 
+    /// Zero for success. Nonzero if an error occurred.
+    pub fn changeUser(self: *Self, user: lib.User) bool {
+        return c.mysql_change_user(self.mysql, user.username, user.password, user.database orelse null);
+    }
+
+    /// Returns the default character set name for the current connection.
+    pub fn getCharacterSetName(self: *Self) [*c]const u8 {
+        return c.mysql_character_set_name(self.mysql);
+    }
+
+    /// Commits the current transaction.
+    /// Zero for success
+    pub fn commit(self: *Self) bool {
+        return c.mysql_commit(self.mysql);
+    }
+
+    pub fn errNo(self: *Self) void {
+        _ = self;
+    
+
+    }
 };
 
 test "mem leak" {
