@@ -9,12 +9,16 @@ test "test" {
     //var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = std.testing.allocator;
     //gpa.allocator();
-    const connection = try conn.Connection.newConnection(allocator, config);
-    defer connection.close();
+    //const connection = try conn.Connection.newConnection(allocator, config);
+    //defer connection.close();
 
-
+    
+    const pl = try pool.ConnectionPool.init(allocator, config, 5);
+    defer pl.deInit();
     //const statement = try connection.prepare("select * from users;");
     //defer statement.close();
+
+    const connection = pl.getConnection();
 
     const tm = std.time.Timer;
     var start = try tm.start();

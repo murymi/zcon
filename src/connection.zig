@@ -18,11 +18,17 @@ pub const Connection = struct {
 
     dirty: bool,
 
+    next: ?*Self,
+
+    idle: bool,
+
     // Creates a connection
     pub fn newConnection(allocator: Allocator, config: ConnectionConfig) !*Self {
         const newSelf = try allocator.create(Self);
         newSelf.allocator = allocator;
         newSelf.dirty = false;
+        newSelf.next = null;
+        newSelf.idle = true;
         newSelf.mysql = try lib.initConnection(config);
 
         return newSelf;

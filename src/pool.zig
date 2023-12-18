@@ -6,6 +6,7 @@ const lib = @import("lib.zig");
 const prepStmt = @import("statement.zig").Statement;
 const Config = lib.ConnectionConfig;
 const c = lib.c;
+const Conn = @import("connection.zig").Connection;
 
 
 pub const ConnectionPool = struct {
@@ -19,22 +20,6 @@ pub const ConnectionPool = struct {
     poolMutex: Threads.Mutex,
     poolCondition: Threads.Condition,
 
-    pub const Conn = struct {
-            connection: *c.MYSQL,
-            next: ?*Conn,
-            idle: bool,
-            allocator: Allocator,
-
-            pub fn prepare(self: *Conn, query: [*c]const u8) !*prepStmt {
-                if(self.idle) return error.connectionIdle;
-                return try prepStmt.init(self.allocator,self.connection, query);
-            }
-
-            pub fn executeQuery(self: *Conn, query: [*c]const u8, parameters: anytype) ![]u8 {
-                return try lib.executeQuery(self.allocator,self.connection, query, parameters);
-            }
-    };
-
     pub fn init(allocator :Allocator,config: Config,size :usize) !*Self {
         var checkedSize: usize = 2;
         if(size > checkedSize){
@@ -42,12 +27,12 @@ pub const ConnectionPool = struct {
         }
         const ptmp = try allocator.create(Self);
 
-        ptmp.firstConn = try createConn(allocator, config);
+        ptmp.firstConn = try Conn.newConnection(allocator, config);
         ptmp.lastConn = ptmp.firstConn;
         ptmp.allocator = allocator;
 
         for(0..checkedSize-1)|_|{
-            ptmp.lastConn.next = try createConn(allocator, config);
+            ptmp.lastConn.next = try Conn.newConnection(allocator, config);
             ptmp.lastConn = ptmp.lastConn.next.?;
         }
 
@@ -59,23 +44,13 @@ pub const ConnectionPool = struct {
         return ptmp;
     }
 
-    fn createConn(allocator: Allocator, config: Config) !*Conn {
-        var newConnecton = try allocator.create(Conn);
-        newConnecton.connection = try lib.initConnection(config);
-        newConnecton.idle = true;
-        newConnecton.allocator = allocator;
-
-        return newConnecton;
-    }
-
     pub fn deInit(self :*Self) void {
         
         var ptmp: ?*Conn = self.firstConn;
         for(0..self.size)|_|{
-            c.mysql_close(ptmp.?.connection);
             const conn = ptmp;
             ptmp = ptmp.?.next;
-            self.allocator.destroy(conn.?);
+            conn.?.close();
         }
 
         self.allocator.destroy(self);
@@ -101,7 +76,6 @@ pub const ConnectionPool = struct {
         }
 
         if(currConn == null){
-            //TODO
             unreachable;
         }
 
