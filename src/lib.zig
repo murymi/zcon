@@ -61,10 +61,6 @@ pub fn executeQuery(allocator: Allocator, mysql: *c.MYSQL, query: [*c]const u8, 
         return res;
     } else |err| {
         switch (err) {
-            // for now panic on sql query errors.
-            error.sqlErr => {
-                std.debug.panic("{s} - {s}\n", .{ c.mysql_sqlstate(mysql), c.mysql_error(mysql) });
-            },
             error.parameterErr => {
                 std.debug.panic("Expected number of parameters not met", .{});
             },
@@ -75,7 +71,7 @@ pub fn executeQuery(allocator: Allocator, mysql: *c.MYSQL, query: [*c]const u8, 
     }
     
     _= c.mysql_stmt_close(statement);
-} //
+}
 
 //create C connection struct
 pub fn initConnection(config: ConnectionConfig) CustomErr!*c.MYSQL {

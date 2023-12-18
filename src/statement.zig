@@ -21,10 +21,7 @@ pub const Statement = struct {
             newSelf.mysql = mysql;
             return newSelf;
         } else |er|{
-            switch (er) {
-                error.sqlErr => std.debug.panic("{s} - {s}\n", .{ c.mysql_sqlstate(mysql), c.mysql_error(mysql)}),
-                else => |e| return e,
-            }
+            return er;
         }
     }
 
@@ -38,9 +35,6 @@ pub const Statement = struct {
             return ptr;
         } else |e|{
             switch(e){
-                error.sqlErr => {
-                    std.debug.panic("{s} - {s}\n", .{ c.mysql_sqlstate(self.mysql), c.mysql_error(self.mysql)});
-                },
                 error.parameterErr =>{
                     std.debug.panic("Expected number of parameters not met", .{});
                 },
