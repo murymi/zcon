@@ -22,6 +22,10 @@ pub const CustomErr = error{
     connectionDirty,
 };
 
+pub const Options = struct {
+
+};
+
 
 pub const User = struct {
     username: [*c]const u8,

@@ -69,7 +69,11 @@ pub const Connection = struct {
     /// on the connection specified. 
     /// Zero for success. Nonzero if an error occurred.
     pub fn changeUser(self: *Self, user: lib.User) bool {
-        return c.mysql_change_user(self.mysql, user.username, user.password, user.database orelse null);
+        if(c.mysql_change_user(self.mysql, user.username, user.password, user.database orelse null) == false){
+            return true;
+        }
+
+        return false;
     }
 
     /// Returns the default character set name for the current connection.
@@ -78,16 +82,71 @@ pub const Connection = struct {
     }
 
     /// Commits the current transaction.
-    /// Zero for success
     pub fn commit(self: *Self) bool {
-        return c.mysql_commit(self.mysql);
+        return !c.mysql_commit(self.mysql);
     }
 
-    pub fn errNo(self: *Self) void {
-        _ = self;
-    
-
+    /// Returns the error code for the most recently
+    /// invoked API function that can succeed or fail. 
+    pub fn errorCode(self: *Self) u16 {
+        return c.mysql_errno(self.mysql);
     }
+
+    /// Returns a null-terminated string containing
+    /// the error message for the most recently invoked API function that failed. 
+    pub fn errorMessage(self: *Self) [*c]const u8 {
+        return c.mysql_errno(self.mysql);
+    }
+
+    /// Returns the number of columns for the most recent query on the connection.
+    pub fn fieldCount(self: *Self) u16 {
+        return c.mysql_field_count(self.mysql);
+    }
+
+    /// Returns the value generated for an AUTO_INCREMENT column by the previous INSERT or UPDATE
+    /// statement.
+    pub fn lastInsertedId(self: *Self) u64 {
+        return c.mysql_insert_id(self.mysql);
+    }
+
+    pub fn ping(self: *Self) bool {
+        if(c.mysql_ping(self.mysql) == 0){
+            return true;
+        }
+
+        return false;
+    }
+
+    /// Resets the connection to clear the session state.
+    pub fn reset(self: *Self) bool {
+        if(c.mysql_reset_connection(self.mysql) == 0){
+            return true;
+        }
+        return false;
+    }
+
+    /// Rolls back the current transaction.
+    pub fn rollBack(self: *Self) bool {
+        if(c.mysql_rollback(self.mysql)){
+            return false;
+        }
+        return true;
+    }
+
+    /// Causes the database specified by db to become the default (current) database on the connection
+    pub fn selectDB(self: *Self, db: [*c]const u8) void {
+        if(c.mysql_select_db(self.mysql, db) == 0){
+            return true;
+        }
+        return false;
+    }
+
+    /// Returns a null-terminated string containing the SQLSTATE error code for the most recently executed
+    /// SQL statement. The error code consists of five characters. '00000' means “no error.”
+    pub fn sqlState(self: *Self) [*c] const u8 {
+        return c.mysql_sqlstate(self.mysql);
+    }
+
 };
 
 test "mem leak" {

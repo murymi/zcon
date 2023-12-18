@@ -24,6 +24,9 @@ test "test" {
     _ = connection.setAutoCommitMode(false);
     _ = connection.getAffectedRows();
     const charset = connection.getCharacterSetName();
+    _ = connection.rollBack();
+    _ = connection.reset();
+    _= connection.ping();
     //const tm = std.time.Timer;
     //var start = try tm.start();
     //const res2 = try statement.execute(.{});
