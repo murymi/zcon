@@ -22,6 +22,8 @@ pub const Connection = struct {
 
     idle: bool,
 
+    pooled: bool,
+
     // Creates a connection
     pub fn newConnection(allocator: Allocator, config: ConnectionConfig) !*Self {
         const newSelf = try allocator.create(Self);
@@ -42,6 +44,9 @@ pub const Connection = struct {
     }
 
     pub fn close(self: *Self) void {
+        if(self.pooled){
+            std.debug.panic("Attempt to close a pooled connection\n", .{});
+        }
         c.mysql_close(self.mysql);
         self.allocator.destroy(self);
     }

@@ -28,11 +28,13 @@ pub const ConnectionPool = struct {
         const ptmp = try allocator.create(Self);
 
         ptmp.firstConn = try Conn.newConnection(allocator, config);
+        ptmp.firstConn.pooled = true;
         ptmp.lastConn = ptmp.firstConn;
         ptmp.allocator = allocator;
 
         for(0..checkedSize-1)|_|{
             ptmp.lastConn.next = try Conn.newConnection(allocator, config);
+            ptmp.lastConn.next.?.pooled = true;
             ptmp.lastConn = ptmp.lastConn.next.?;
         }
 
@@ -91,14 +93,14 @@ pub const ConnectionPool = struct {
         self.poolCondition.signal();
     }
 
-    pub fn executeQuery(self: *Self, query: [*c]const u8, parameters: anytype) ![]u8 {
-        const conn = self.getConnection();
-        defer {
-            self.dropConnection(conn);
-        }
-        const res = try lib.executeQuery(self.allocator,conn.connection, query, parameters);
-        return res;
-    }
+    // pub fn executeQuery(self: *Self, query: [*c]const u8, parameters: anytype) ![]u8 {
+    //     const conn = self.getConnection();
+    //     defer {
+    //         self.dropConnection(conn);
+    //     }
+    //     const res = try lib.executeQuery(self.allocator,conn.connection, query, parameters);
+    //     return res;
+    // }
 
 };
 
