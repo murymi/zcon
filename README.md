@@ -17,7 +17,6 @@ pub fn build(b: *std.Build) void {
 
     const target = b.standardTargetOptions(.{});
 
-
     const optimize = b.standardOptimizeOption(.{});
 
     const pkg = b.dependency("zconn", .{
@@ -25,25 +24,25 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize
     });
 
-    const example = b.addExecutable(.{
+    const example = pkg.builder.addExecutable(.{
         .target = target,
         .name = "example",
-        // replace 
-        .root_source_file = .{ .path = "src/your_file_name.zig" },
-        .optimize = optimize
+        .root_source_file = .{ .path = "src/main.zig" },
+        .optimize = optimize,
+        .link_libc = true
     });
 
-    b.installArtifact(example);
+    example.root_module.addImport("zconn", pkg.module("zconn"));
 
     const libs_to_link = [_][]const u8{"mysqlclient","zstd","ssl", "crypto" ,"resolv" ,"m"};
-	
 
+    example.linkLibC();
+	
     for(libs_to_link) |l| {
         example.linkSystemLibrary(l);
     }
-    
 
-    example.addModule("zconn", pkg.module("zconn"));
+    b.installArtifact(example);
 
 }
 
