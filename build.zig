@@ -7,7 +7,7 @@ pub fn build(b: *std.Build) void {
     const libs_to_link = [_][]const u8{"mysqlclient","zstd","ssl", "crypto" ,"resolv" ,"m"};
 	
     const module  = b.addModule("zconn", .{
-        .source_file = std.Build.LazyPath.relative("src/root.zig")
+        .root_source_file = std.Build.LazyPath.relative("src/root.zig"),
     });
 
 	const lib = b.addStaticLibrary(.{
@@ -17,6 +17,7 @@ pub fn build(b: *std.Build) void {
         .target = target
 	});
 	
+    lib.linkLibC();
     for(libs_to_link) |l| {
         lib.linkSystemLibrary(l);
     }
@@ -45,6 +46,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize
     });
 
+    short.linkLibC();
     for(libs_to_link) |l| {
         short.linkSystemLibrary(l);
     }
