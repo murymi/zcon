@@ -52,6 +52,7 @@ pub const ConnectionPool = struct {
         for(0..self.size)|_|{
             const conn = ptmp;
             ptmp = ptmp.?.next;
+            conn.?.pooled = false;
             conn.?.close();
         }
 

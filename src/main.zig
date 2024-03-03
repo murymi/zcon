@@ -1,13 +1,13 @@
-const std = @import("std");
+const stdy = @import("std");
 const conn = @import("connection.zig");
-const Allocator = std.mem.Allocator;
+const Allocator = stdy.mem.Allocator;
 const pool = @import("pool.zig");
 const config = .{ .databaseName = "events", .host = "localhost", .password = "1234Victor", .username = "vic" };
-const json = std.json;
+const json = stdy.json;
 
 test "test" {
     //var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = std.testing.allocator;
+    const allocator = stdy.testing.allocator;
     //gpa.allocator();
     //const connection = try conn.Connection.newConnection(allocator, config);
     //defer connection.close();
@@ -43,6 +43,15 @@ test "test" {
     //}
 //
     //res.deinit();
-    std.debug.print("Taken {s} ms\n", .{charset});
+    stdy.debug.print("Taken {s} ms\n", .{charset});
 
+}
+
+pub fn main () !void {
+    var gpa = stdy.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+    const pl = try pool.ConnectionPool.init(allocator, config, 5);
+    defer pl.deInit();
+   // _= pl;
+    stdy.debug.print("hello world\n", .{});
 }

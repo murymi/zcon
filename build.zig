@@ -6,8 +6,8 @@ pub fn build(b: *std.Build) void {
 	const optimize = b.standardOptimizeOption(.{});
     const libs_to_link = [_][]const u8{"mysqlclient","zstd","ssl", "crypto" ,"resolv" ,"m"};
 	
-    _ = b.addModule("zconn", .{
-        .source_file = .{ .path = "src/root.zig"}
+    const module  = b.addModule("zconn", .{
+        .source_file = std.Build.LazyPath.relative("src/root.zig")
     });
 
 	const lib = b.addStaticLibrary(.{
@@ -34,7 +34,24 @@ pub fn build(b: *std.Build) void {
         main_tests.linkSystemLibrary(l);
     }
 
+    const run_tests = b.addRunArtifact(main_tests);
     const test_step = b.step("test", "Run library tests");
-    test_step.dependOn(&main_tests.step);
+    test_step.dependOn(&run_tests.step);
+
+    const short = b.addExecutable(.{
+        .target = target,
+        .name = "short",
+        .root_source_file = .{ .path = "src/main.zig" },
+        .optimize = optimize
+    });
+
+    for(libs_to_link) |l| {
+        short.linkSystemLibrary(l);
+    }
+
+    //short.root_module.addImport("zconn", module);
+    b.installArtifact(short);
+
+    _ = module;
 
 }
